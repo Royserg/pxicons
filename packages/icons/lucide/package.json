@@ -1,0 +1,19 @@
+{
+  "name": "@pxicons/lucide",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "convert": "node ./scripts/convert-lucide-to-pixel.mjs"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*.svg": "./*.svg",
+    "./package.json": "./package.json"
+  },
+  "devDependencies": {
+    "fast-xml-parser": "catalog:",
+    "lucide-static": "catalog:",
+    "svg-path-properties": "catalog:"
+  }
+}

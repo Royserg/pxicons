@@ -1,5 +1,8 @@
 <script lang="ts">
 	import './layout.css';
+	import 'geist-svelte/font/pixel';
+	import 'geist-svelte/font/mono';
+
 	import favicon from '$lib/assets/favicon.svg';
 
 	let { children } = $props();
@@ -9,6 +12,6 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<main class="h-dvh w-dvw">
+<main>
 	{@render children()}
 </main>

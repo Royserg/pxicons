@@ -4,7 +4,8 @@ import adapter from '@sveltejs/adapter-cloudflare';
 const config = {
 	kit: { adapter: adapter() },
 	vitePlugin: {
-		dynamicCompileOptions: ({ filename }) => filename.includes('node_modules') ? undefined : { runes: true }
+		dynamicCompileOptions: ({ filename }) =>
+			filename.includes('node_modules') ? undefined : { runes: true }
 	}
 };
 

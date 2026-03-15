@@ -1,0 +1,111 @@
+import { describe, expect, it } from 'vite-plus/test';
+import { getLucideIcon, lucidePixelMap } from '@pxicons/lucide';
+import { buildCustomizedSvg } from './icon-svg';
+
+const settingsIcon = getLucideIcon('settings');
+const searchIcon = getLucideIcon('search');
+
+if (!settingsIcon) {
+	throw new Error('Expected settings icon fixture to exist');
+}
+
+if (!searchIcon) {
+	throw new Error('Expected search icon fixture to exist');
+}
+
+function extractSymbolId(svg: string): string {
+	const match = svg.match(/<symbol id="([^"]+)"/);
+
+	if (!match?.[1]) {
+		throw new Error('Expected SVG to include a symbol id');
+	}
+
+	return match[1];
+}
+
+describe('buildCustomizedSvg', () => {
+	it('renders into a fixed 24x24 canvas using symbol/use structure', () => {
+		const customized = buildCustomizedSvg(settingsIcon, {
+			color: '#ff00aa',
+			size: 128,
+			padding: 3,
+			backgroundColor: '#f4f4f4',
+			shape: 'square'
+		});
+
+		expect(customized).toContain('width="128"');
+		expect(customized).toContain('height="128"');
+		expect(customized).toContain('viewBox="0 0 24 24"');
+		expect(customized).toContain('fill="#ff00aa"');
+		expect(customized).toContain('fill="#f4f4f4"');
+		expect(customized).toContain('<defs>');
+		expect(customized).toContain('<symbol id="');
+		expect(customized).toContain('<use href="#');
+		expect(customized).toContain('width="1" height="1"');
+		expect(customized.match(/<use href=/g)?.length ?? 0).toBe(lucidePixelMap.settings.length);
+		expect(customized).toContain('transform="translate(3 3) scale(0.75)"');
+	});
+
+	it('renders primitive geometry for circle and rounded shapes', () => {
+		const circleSvg = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'circle'
+		});
+		const roundedSvg = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'rounded'
+		});
+
+		expect(circleSvg).toContain('<circle cx="0.5" cy="0.5" r="0.5" />');
+		expect(roundedSvg).toContain('<rect width="1" height="1" rx="0.24" ry="0.24" />');
+	});
+
+	it('creates deterministic and icon-specific symbol ids', () => {
+		const settingsSquare = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 1,
+			shape: 'square'
+		});
+		const settingsSquareAgain = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 1,
+			shape: 'square'
+		});
+		const settingsCircle = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 1,
+			shape: 'circle'
+		});
+		const searchSquare = buildCustomizedSvg(searchIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 1,
+			shape: 'square'
+		});
+
+		expect(extractSymbolId(settingsSquare)).toBe(extractSymbolId(settingsSquareAgain));
+		expect(extractSymbolId(settingsSquare)).not.toBe(extractSymbolId(settingsCircle));
+		expect(extractSymbolId(settingsSquare)).not.toBe(extractSymbolId(searchSquare));
+	});
+
+	it('does not mutate the original source SVG', () => {
+		const original = settingsIcon.svg;
+
+		buildCustomizedSvg(settingsIcon, {
+			color: '#111111',
+			size: 256,
+			padding: 4,
+			backgroundColor: '',
+			shape: 'rounded'
+		});
+
+		expect(settingsIcon.svg).toBe(original);
+	});
+});
