@@ -189,8 +189,10 @@ a {
 }
 
 .icon-grid {
+  --tile-min-width: 96;
+  --tile-row-height: 95;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--tile-min-width) * 1px), 1fr));
   gap: 0.5rem;
 }
 
@@ -203,6 +205,7 @@ a {
   gap: 0.4rem;
   justify-items: center;
   align-content: start;
+  height: calc(var(--tile-row-height) * 1px);
   cursor: pointer;
   transition: border-color 0.15s ease;
 }
@@ -248,6 +251,12 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.grid-spacer {
+  grid-column: 1 / -1;
+  width: 100%;
+  pointer-events: none;
 }
 
 .selected-drawer {
@@ -471,7 +480,9 @@ a {
 
 @media (max-width: 640px) {
   .icon-grid {
-    grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+    --tile-min-width: 82;
+    --tile-row-height: 93;
+    grid-template-columns: repeat(auto-fill, minmax(calc(var(--tile-min-width) * 1px), 1fr));
   }
 
   .control-grid {

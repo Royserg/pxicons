@@ -1,12 +1,15 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { lucideIcons, type PixelIcon, type PixelShape } from '@pxicons/lucide';
 	import { filterPixelIcons } from '$lib/icon-search';
 	import { buildCustomizedSvg } from '$lib/icon-svg';
+	import { computeVirtualGridWindow } from '$lib/icon-grid-window';
 	import * as Drawer from '$lib/components/ui/drawer';
 
 	const icons = lucideIcons;
 	const shapeOptions: PixelShape[] = ['square', 'circle', 'rounded'];
 	const packageFilters = [{ id: 'lucide', label: 'Lucide', count: icons.length }];
+	const GRID_OVERSCAN_ROWS = 4;
 
 	let query = $state('');
 	let selectedId = $state('');
@@ -19,8 +22,36 @@
 	let withBackground = $state(false);
 	let backgroundColor = $state('#0f0f10');
 	let copyStatus = $state('');
+	let windowScrollY = $state(0);
+	let viewportHeight = $state(0);
+	let gridWidth = $state(0);
+	let gridGap = $state(8);
+	let tileMinWidth = $state(96);
+	let tileRowHeight = $state(96);
+	let gridOffsetTop = $state(0);
+
+	let gridElement: HTMLElement | null = null;
 
 	const filteredIcons = $derived(filterPixelIcons(icons, query));
+	const gridColumns = $derived.by(() => {
+		const safeTileWidth = Math.max(1, tileMinWidth);
+		const safeGap = Math.max(0, gridGap);
+		const width = Math.max(gridWidth, safeTileWidth);
+
+		return Math.max(1, Math.floor((width + safeGap) / (safeTileWidth + safeGap)));
+	});
+	const relativeScrollTop = $derived(Math.max(0, windowScrollY - gridOffsetTop));
+	const virtualWindow = $derived(
+		computeVirtualGridWindow({
+			totalItems: filteredIcons.length,
+			columns: gridColumns,
+			rowHeight: tileRowHeight,
+			viewportHeight: viewportHeight || 720,
+			scrollTop: relativeScrollTop,
+			overscanRows: GRID_OVERSCAN_ROWS
+		})
+	);
+	const visibleIcons = $derived(filteredIcons.slice(virtualWindow.startIndex, virtualWindow.endIndex));
 
 	const selectedIcon = $derived.by(() => {
 		if (!selectedId) {
@@ -71,6 +102,11 @@
 	});
 
 	$effect(() => {
+		void filteredIcons.length;
+		syncGridMetrics();
+	});
+
+	$effect(() => {
 		if (!drawerOpen && selectedId) {
 			selectedId = '';
 			copyStatus = '';
@@ -87,6 +123,42 @@
 		selectedId = '';
 		drawerOpen = false;
 		copyStatus = '';
+	}
+
+	function syncGridMetrics(): void {
+		if (!gridElement || typeof window === 'undefined') {
+			return;
+		}
+
+		gridWidth = gridElement.clientWidth;
+		gridOffsetTop = gridElement.getBoundingClientRect().top + window.scrollY;
+
+		const styles = getComputedStyle(gridElement);
+		const nextGap = Number.parseFloat(styles.rowGap || styles.gap || '8');
+		const nextTileWidth = Number.parseFloat(styles.getPropertyValue('--tile-min-width'));
+		const nextRowHeight = Number.parseFloat(styles.getPropertyValue('--tile-row-height'));
+
+		if (Number.isFinite(nextGap)) {
+			gridGap = nextGap;
+		}
+
+		if (Number.isFinite(nextTileWidth) && nextTileWidth > 0) {
+			tileMinWidth = nextTileWidth;
+		}
+
+		if (Number.isFinite(nextRowHeight) && nextRowHeight > 0) {
+			tileRowHeight = nextRowHeight;
+		}
+	}
+
+	function handleViewportChange(): void {
+		if (typeof window === 'undefined') {
+			return;
+		}
+
+		windowScrollY = window.scrollY;
+		viewportHeight = window.innerHeight;
+		syncGridMetrics();
 	}
 
 	function getGridIconSvg(icon: PixelIcon): string {
@@ -114,6 +186,30 @@
 			copyStatus = `${label} copy failed. Clipboard permission may be blocked.`;
 		}
 	}
+
+	onMount(() => {
+		handleViewportChange();
+
+		const resizeObserver =
+			typeof ResizeObserver === 'undefined' || !gridElement
+				? null
+				: new ResizeObserver(() => {
+						syncGridMetrics();
+					});
+
+		if (resizeObserver && gridElement) {
+			resizeObserver.observe(gridElement);
+		}
+
+		window.addEventListener('scroll', handleViewportChange, { passive: true });
+		window.addEventListener('resize', handleViewportChange);
+
+		return () => {
+			resizeObserver?.disconnect();
+			window.removeEventListener('scroll', handleViewportChange);
+			window.removeEventListener('resize', handleViewportChange);
+		};
+	});
 </script>
 
 <div class="catalog-shell">
@@ -139,22 +235,38 @@
 		</label>
 	</div>
 
-	<section class="icon-grid" aria-label="Available pixel icons">
+	<section class="icon-grid" aria-label="Available pixel icons" bind:this={gridElement}>
 		{#if filteredIcons.length === 0}
 			<p class="empty-state">No icon matches this query.</p>
-		{/if}
+		{:else}
+			{#if virtualWindow.topSpacerHeight > 0}
+				<div
+					class="grid-spacer"
+					style={`height:${virtualWindow.topSpacerHeight}px`}
+					aria-hidden="true"
+				></div>
+			{/if}
 
-		{#each filteredIcons as icon (icon.id)}
-			<button
-				type="button"
-				class="icon-tile"
-				class:active={selectedId === icon.id}
-				onclick={() => selectIcon(icon)}
-			>
-				<span class="tile-canvas">{@html getGridIconSvg(icon)}</span>
-				<span class="tile-label">{icon.id}</span>
-			</button>
-		{/each}
+			{#each visibleIcons as icon (icon.id)}
+				<button
+					type="button"
+					class="icon-tile"
+					class:active={selectedId === icon.id}
+					onclick={() => selectIcon(icon)}
+				>
+					<span class="tile-canvas">{@html getGridIconSvg(icon)}</span>
+					<span class="tile-label">{icon.id}</span>
+				</button>
+			{/each}
+
+			{#if virtualWindow.bottomSpacerHeight > 0}
+				<div
+					class="grid-spacer"
+					style={`height:${virtualWindow.bottomSpacerHeight}px`}
+					aria-hidden="true"
+				></div>
+			{/if}
+		{/if}
 	</section>
 
 	<Drawer.Root bind:open={drawerOpen} shouldScaleBackground={false}>
