@@ -212,11 +212,12 @@ a {
 .icon-grid-section {
   display: grid;
   min-height: 0;
+  contain: layout paint;
 }
 
 .icon-grid-viewport {
-  --tile-min-width: 96;
-  --tile-row-height: 95;
+  --tile-min-width: 136;
+  --tile-row-height: 135;
   --grid-gap: 8;
   position: relative;
   height: 100%;
@@ -229,6 +230,10 @@ a {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
+}
+
+.icon-grid-viewport.paused {
+  pointer-events: none;
 }
 
 .icon-grid-viewport::-webkit-scrollbar {
@@ -297,12 +302,12 @@ a {
 .icon-tile {
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 0.5rem 0.4rem;
+  padding: 0.6rem 0.45rem;
   background: var(--surface);
   display: grid;
-  gap: 0.4rem;
+  gap: 0.5rem;
   justify-items: center;
-  align-content: start;
+  align-content: center;
   height: calc(var(--tile-row-height) * 1px);
   cursor: pointer;
   transition: border-color 0.15s ease;
@@ -317,9 +322,14 @@ a {
   background: #0e0e11;
 }
 
+.icon-tile.active .tile-canvas {
+  border-color: #2f3542;
+  background-color: #10141b;
+}
+
 .tile-canvas {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   padding: 2px;
   display: grid;
   place-items: center;
@@ -572,8 +582,8 @@ a {
 
 @media (max-width: 640px) {
   .icon-grid-viewport {
-    --tile-min-width: 82;
-    --tile-row-height: 93;
+    --tile-min-width: 120;
+    --tile-row-height: 127;
   }
 
   .control-grid {

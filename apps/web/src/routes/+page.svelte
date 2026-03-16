@@ -11,7 +11,7 @@
 
 	const icons = lucideIcons;
 	const shapeOptions: PixelShape[] = ['square', 'circle', 'rounded'];
-	const GRID_OVERSCAN_ROWS = 6;
+	const GRID_OVERSCAN_ROWS = 3;
 
 	let query = $state('');
 	let selectedId = $state('');
@@ -25,14 +25,17 @@
 	let withBackground = $state(false);
 	let backgroundColor = $state('#0f0f10');
 	let copyStatus = $state('');
+	let pendingClearSelection = $state(false);
 	let gridWidth = $state(0);
 	let gridGap = $state(8);
-	let tileMinWidth = $state(96);
-	let tileRowHeight = $state(95);
+	let tileMinWidth = $state(136);
+	let tileRowHeight = $state(135);
+	let gridIconsSnapshot = $state<readonly PixelIcon[]>(icons);
 
 	let gridViewportElement = $state<HTMLElement | null>(null);
 
 	const filteredIcons = $derived(filterPixelIcons(icons, query));
+	const renderedGridIcons = $derived(drawerOpen ? gridIconsSnapshot : filteredIcons);
 	const gridColumns = $derived.by(() => {
 		const safeTileWidth = Math.max(1, tileMinWidth);
 		const safeGap = Math.max(0, gridGap);
@@ -40,7 +43,7 @@
 
 		return Math.max(1, Math.floor((width + safeGap) / (safeTileWidth + safeGap)));
 	});
-	const virtualRowCount = $derived(getIconRowCount(filteredIcons.length, gridColumns));
+	const virtualRowCount = $derived(getIconRowCount(renderedGridIcons.length, gridColumns));
 
 	const rowVirtualizer = createVirtualizer<HTMLElement, HTMLElement>({
 		count: 0,
@@ -106,21 +109,62 @@
 	});
 
 	$effect(() => {
+		// Keep grid data "live" only when the drawer is closed; freeze while open.
+		if (!drawerOpen) {
+			gridIconsSnapshot = filteredIcons;
+		}
+	});
+
+	$effect(() => {
 		if (selectedId && !filteredIcons.some((icon) => icon.id === selectedId)) {
-			clearSelection();
+			clearSelectionImmediately();
 		}
 	});
 
 	function selectIcon(icon: PixelIcon): void {
+		pendingClearSelection = false;
 		selectedId = icon.id;
 		drawerOpen = true;
 		copyStatus = '';
 	}
 
-	function clearSelection(): void {
+	function requestCloseDrawer(): void {
+		if (!selectedId) {
+			return;
+		}
+
+		pendingClearSelection = true;
+		drawerOpen = false;
+		copyStatus = '';
+	}
+
+	function clearSelectionImmediately(): void {
+		pendingClearSelection = false;
 		selectedId = '';
 		drawerOpen = false;
 		copyStatus = '';
+	}
+
+	function handleDrawerOpenChange(open: boolean): void {
+		drawerOpen = open;
+
+		if (open) {
+			pendingClearSelection = false;
+			return;
+		}
+
+		if (selectedId) {
+			pendingClearSelection = true;
+		}
+	}
+
+	function handleDrawerAnimationEnd(open: boolean): void {
+		if (open || !pendingClearSelection || drawerOpen) {
+			return;
+		}
+
+		selectedId = '';
+		pendingClearSelection = false;
 	}
 
 	function syncGridMetrics(): void {
@@ -149,7 +193,7 @@
 	}
 
 	function getGridIconSvg(icon: PixelIcon): string {
-		return buildCustomizedSvg(icon, buildGridSvgOptions(selectedId === icon.id));
+		return buildCustomizedSvg(icon, buildGridSvgOptions());
 	}
 
 	async function copyText(value: string, label: string): Promise<void> {
@@ -190,7 +234,7 @@
 
 <div class="catalog-shell">
 	<div class="catalog-toolbar">
-		<p class="pl-1 text-sm text-muted-foreground">{filteredIcons.length} results</p>
+		<p class="pl-1 text-sm text-muted-foreground">{renderedGridIcons.length} results</p>
 		<label class="search-field" for="icon-search">
 			<input
 				id="icon-search"
@@ -203,10 +247,10 @@
 	</div>
 
 	<section class="icon-grid-section" aria-label="Available pixel icons">
-		{#if filteredIcons.length === 0}
+		{#if renderedGridIcons.length === 0}
 			<p class="empty-state">No icon matches this query.</p>
 		{:else}
-			<div class="icon-grid-viewport" bind:this={gridViewportElement}>
+			<div class="icon-grid-viewport" class:paused={drawerOpen} bind:this={gridViewportElement}>
 				<div class="icon-grid-canvas" style={`height:${Math.max(1, virtualTotalHeight)}px`}>
 					{#each virtualRows as virtualRow (virtualRow.key)}
 						<div
@@ -217,7 +261,7 @@
 								class="icon-grid-row"
 								style={`--grid-columns:${gridColumns}`}
 							>
-								{#each getIconsForRow(filteredIcons, gridColumns, virtualRow.index) as icon (icon.id)}
+								{#each getIconsForRow(renderedGridIcons, gridColumns, virtualRow.index) as icon (icon.id)}
 									<button
 										type="button"
 										class="icon-tile"
@@ -236,7 +280,15 @@
 		{/if}
 	</section>
 
-	<Drawer.Root bind:open={drawerOpen} shouldScaleBackground={false}>
+	<Drawer.Root
+		open={drawerOpen}
+		handleOnly
+		disablePreventScroll={false}
+		repositionInputs={false}
+		shouldScaleBackground={false}
+		onOpenChange={handleDrawerOpenChange}
+		onAnimationEnd={handleDrawerAnimationEnd}
+	>
 		{#if selectedIcon}
 			<Drawer.Content class="selected-drawer">
 				<section class="selected-panel" aria-live="polite">
@@ -254,7 +306,7 @@
 								<button
 									type="button"
 									class="close-button"
-									onclick={clearSelection}
+									onclick={requestCloseDrawer}
 									aria-label="Close"
 								>
 									×

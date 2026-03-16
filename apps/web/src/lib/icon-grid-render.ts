@@ -4,10 +4,11 @@ import type { SvgCustomizationOptions } from './icon-svg';
 const GRID_SHAPE: PixelShape = 'square';
 const GRID_PIXEL_GAP = 0;
 const GRID_SIZE = 24;
+const GRID_COLOR = '#d6d6d9';
 
-export function buildGridSvgOptions(isSelected: boolean): SvgCustomizationOptions {
+export function buildGridSvgOptions(): SvgCustomizationOptions {
 	return {
-		color: isSelected ? '#fafafa' : '#d6d6d9',
+		color: GRID_COLOR,
 		size: GRID_SIZE,
 		padding: 0,
 		pixelGap: GRID_PIXEL_GAP,

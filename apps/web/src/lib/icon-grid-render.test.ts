@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vite-plus/test';
 import { buildGridSvgOptions } from './icon-grid-render';
 
 describe('buildGridSvgOptions', () => {
-	it('returns stable grid rendering defaults for unselected icons', () => {
-		expect(buildGridSvgOptions(false)).toEqual({
+	it('returns stable grid rendering defaults', () => {
+		expect(buildGridSvgOptions()).toEqual({
 			color: '#d6d6d9',
 			size: 24,
 			padding: 0,
@@ -14,12 +14,7 @@ describe('buildGridSvgOptions', () => {
 		});
 	});
 
-	it('only changes color when icon is selected', () => {
-		const selected = buildGridSvgOptions(true);
-		const unselected = buildGridSvgOptions(false);
-
-		expect(selected.color).toBe('#fafafa');
-		expect(unselected.color).toBe('#d6d6d9');
-		expect({ ...selected, color: unselected.color }).toEqual(unselected);
+	it('returns the same options regardless of repeated calls', () => {
+		expect(buildGridSvgOptions()).toEqual(buildGridSvgOptions());
 	});
 });

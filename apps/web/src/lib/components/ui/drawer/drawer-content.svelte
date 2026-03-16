@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Drawer as DrawerPrimitive } from "vaul-svelte";
 	import DrawerPortal from "./drawer-portal.svelte";
+	import DrawerHandle from "./drawer-handle.svelte";
 	import DrawerOverlay from "./drawer-overlay.svelte";
 	import { cn } from "$lib/utils.js";
 	import type { ComponentProps } from "svelte";
@@ -32,9 +33,7 @@
 		)}
 		{...restProps}
 	>
-		<div
-			class="bg-muted mx-auto mt-4 hidden h-2 w-[100px] shrink-0 rounded-full group-data-[vaul-drawer-direction=bottom]/drawer-content:block"
-		></div>
+		<DrawerHandle class="hidden" />
 		{@render children?.()}
 	</DrawerPrimitive.Content>
 </DrawerPortal>
