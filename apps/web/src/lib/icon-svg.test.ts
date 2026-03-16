@@ -23,6 +23,16 @@ function extractSymbolId(svg: string): string {
 	return match[1];
 }
 
+function extractMetaballFilterId(svg: string): string {
+	const match = svg.match(/<filter id="([^"]*mb[^"]*)"/);
+
+	if (!match?.[1]) {
+		throw new Error('Expected SVG to include a metaball filter id');
+	}
+
+	return match[1];
+}
+
 describe('buildCustomizedSvg', () => {
 	it('renders into a fixed 24x24 canvas using symbol/use structure', () => {
 		const customized = buildCustomizedSvg(settingsIcon, {
@@ -64,6 +74,42 @@ describe('buildCustomizedSvg', () => {
 		expect(roundedSvg).toContain('<rect width="1" height="1" rx="0.24" ry="0.24" />');
 	});
 
+	it('injects metaball filter only when enabled', () => {
+		const metaballOn = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'square',
+			metaball: {
+				enabled: true,
+				strength: 45
+			}
+		});
+		const metaballOff = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'square',
+			metaball: {
+				enabled: false,
+				strength: 45
+			}
+		});
+
+		expect(metaballOn).toContain('<filter id="');
+		expect(metaballOn).toContain('<feMorphology');
+		expect(metaballOn).toContain('<feGaussianBlur');
+		expect(metaballOn).toContain('<feColorMatrix');
+		expect(metaballOn).toContain('stdDeviation="0.462"');
+		expect(metaballOn).toContain('filter="url(#');
+		expect(metaballOn).toContain('shape-rendering="geometricPrecision"');
+
+		expect(metaballOff).not.toContain('<feGaussianBlur');
+		expect(metaballOff).not.toContain('<feColorMatrix');
+		expect(metaballOff).not.toContain('filter="url(#');
+		expect(metaballOff).toContain('shape-rendering="crispEdges"');
+	});
+
 	it('creates deterministic and icon-specific symbol ids', () => {
 		const settingsSquare = buildCustomizedSvg(settingsIcon, {
 			color: '#ffffff',
@@ -93,6 +139,42 @@ describe('buildCustomizedSvg', () => {
 		expect(extractSymbolId(settingsSquare)).toBe(extractSymbolId(settingsSquareAgain));
 		expect(extractSymbolId(settingsSquare)).not.toBe(extractSymbolId(settingsCircle));
 		expect(extractSymbolId(settingsSquare)).not.toBe(extractSymbolId(searchSquare));
+	});
+
+	it('creates deterministic filter ids and varies by metaball strength', () => {
+		const strength45 = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 1,
+			shape: 'rounded',
+			metaball: {
+				enabled: true,
+				strength: 45
+			}
+		});
+		const strength45Again = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 1,
+			shape: 'rounded',
+			metaball: {
+				enabled: true,
+				strength: 45
+			}
+		});
+		const strength75 = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 1,
+			shape: 'rounded',
+			metaball: {
+				enabled: true,
+				strength: 75
+			}
+		});
+
+		expect(extractMetaballFilterId(strength45)).toBe(extractMetaballFilterId(strength45Again));
+		expect(extractMetaballFilterId(strength45)).not.toBe(extractMetaballFilterId(strength75));
 	});
 
 	it('does not mutate the original source SVG', () => {

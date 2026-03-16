@@ -14,6 +14,8 @@
 	let color = $state('#f3f5f8');
 	let size = $state(192);
 	let shape = $state<PixelShape>('square');
+	let metaballEnabled = $state(false);
+	let metaballStrength = $state(45);
 	let withBackground = $state(false);
 	let backgroundColor = $state('#0f0f10');
 	let copyStatus = $state('');
@@ -54,7 +56,11 @@
 			padding: 0,
 			backgroundColor: withBackground ? backgroundColor : '',
 			shape,
-			scope: 'detail'
+			scope: 'detail',
+			metaball: {
+				enabled: metaballEnabled,
+				strength: metaballStrength
+			}
 		});
 	});
 
@@ -213,6 +219,23 @@
 										{/each}
 									</div>
 								</div>
+
+								<label class="toggle-row">
+									<input type="checkbox" bind:checked={metaballEnabled} />
+									Liquid merge
+								</label>
+
+								<label class:disabled={!metaballEnabled}>
+									Strength <span>{metaballStrength}</span>
+									<input
+										type="range"
+										min="0"
+										max="100"
+										step="1"
+										bind:value={metaballStrength}
+										disabled={!metaballEnabled}
+									/>
+								</label>
 
 								<label class="toggle-row">
 									<input type="checkbox" bind:checked={withBackground} />

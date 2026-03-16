@@ -1,5 +1,10 @@
 import { lucidePixelMap, type PixelIcon, type PixelShape } from '@pxicons/lucide';
 
+export interface MetaballOptions {
+	enabled: boolean;
+	strength: number;
+}
+
 export interface SvgCustomizationOptions {
 	color: string;
 	size: number;
@@ -7,6 +12,7 @@ export interface SvgCustomizationOptions {
 	backgroundColor?: string;
 	shape?: PixelShape;
 	scope?: RenderScope;
+	metaball?: MetaballOptions;
 }
 
 const PIXEL_CANVAS_SIZE = 24;
@@ -91,6 +97,16 @@ function getPrimitiveMarkup(shape: PixelShape): string {
 	}
 }
 
+function toFilterId(iconId: string, signature: string): string {
+	const safeIconId = iconId
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9_-]+/g, '-')
+		.replace(/^-+|-+$/g, '');
+	const fallbackId = safeIconId || 'icon';
+	return `px-${fallbackId}-mb-${hashText(signature)}`;
+}
+
 function createUsesMarkup(symbolId: string, iconId: string): string {
 	const cells = lucidePixelMap[iconId] ?? [];
 
@@ -104,6 +120,29 @@ function createUsesMarkup(symbolId: string, iconId: string): string {
 				`    <use href="#${symbolId}" x="${x}" y="${y}" width="1" height="1" />`
 		)
 		.join('\n');
+}
+
+function clampStrength(value: number | undefined): number {
+	if (value === undefined || !Number.isFinite(value)) {
+		return 45;
+	}
+
+	return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function normalizeMetaball(value: MetaballOptions | undefined): MetaballOptions {
+	return {
+		enabled: Boolean(value?.enabled),
+		strength: clampStrength(value?.strength)
+	};
+}
+
+function createMetaballFilterMarkup(filterId: string, strength: number): string {
+	const normalizedStrength = strength / 100;
+	const dilation = formatNumber(0.02 + 0.22 * normalizedStrength);
+	const stdDeviation = formatNumber(0.12 + 0.76 * normalizedStrength);
+
+	return `    <filter id="${filterId}" x="-3" y="-3" width="30" height="30" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">\n      <feMorphology in="SourceGraphic" operator="dilate" radius="${dilation}" result="metaball-grow" />\n      <feGaussianBlur in="metaball-grow" stdDeviation="${stdDeviation}" result="metaball-blur" />\n      <feColorMatrix in="metaball-blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 28 -11" />\n    </filter>`;
 }
 
 function normalizeColor(value: string | undefined, fallback: string): string {
@@ -123,7 +162,8 @@ export function buildCustomizedSvg(icon: PixelIcon, options: SvgCustomizationOpt
 	const backgroundColor = normalizeColor(options.backgroundColor, '');
 	const shape = normalizeShape(options.shape);
 	const scope = normalizeScope(options.scope);
-	const cacheKey = `${icon.id}|${shape}|${color}|${size}|${padding}|${backgroundColor}`;
+	const metaball = normalizeMetaball(options.metaball);
+	const cacheKey = `${icon.id}|${shape}|${color}|${size}|${padding}|${backgroundColor}|mb:${metaball.enabled ? 1 : 0}:${metaball.strength}`;
 	const cache = scope === 'grid' ? gridSvgCache : detailSvgCache;
 
 	const cachedSvg = cache.get(cacheKey);
@@ -136,13 +176,19 @@ export function buildCustomizedSvg(icon: PixelIcon, options: SvgCustomizationOpt
 	const scale = drawableSize / PIXEL_CANVAS_SIZE;
 	const translate = padding;
 	const symbolId = toSymbolId(icon.id, shape, cacheKey);
+	const filterId = toFilterId(icon.id, cacheKey);
 	const primitive = getPrimitiveMarkup(shape);
 	const usesMarkup = createUsesMarkup(symbolId, icon.id);
+	const metaballFilter = metaball.enabled
+		? `${createMetaballFilterMarkup(filterId, metaball.strength)}\n`
+		: '';
+	const groupFilterAttribute = metaball.enabled ? ` filter="url(#${filterId})"` : '';
+	const shapeRendering = metaball.enabled ? 'geometricPrecision' : 'crispEdges';
 	const backgroundRect = backgroundColor
 		? `  <rect x="0" y="0" width="${PIXEL_CANVAS_SIZE}" height="${PIXEL_CANVAS_SIZE}" fill="${backgroundColor}"/>\n`
 		: '';
 
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PIXEL_CANVAS_SIZE} ${PIXEL_CANVAS_SIZE}" width="${size}" height="${size}" fill="none" shape-rendering="crispEdges">\n${backgroundRect}  <defs>\n    <symbol id="${symbolId}" viewBox="0 0 1 1" overflow="visible">\n      ${primitive}\n    </symbol>\n  </defs>\n  <g fill="${color}" transform="translate(${formatNumber(translate)} ${formatNumber(translate)}) scale(${formatNumber(scale)})">\n${usesMarkup}\n  </g>\n</svg>`;
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PIXEL_CANVAS_SIZE} ${PIXEL_CANVAS_SIZE}" width="${size}" height="${size}" fill="none" shape-rendering="${shapeRendering}">\n${backgroundRect}  <defs>\n    <symbol id="${symbolId}" viewBox="0 0 1 1" overflow="visible">\n      ${primitive}\n    </symbol>\n${metaballFilter}  </defs>\n  <g fill="${color}" transform="translate(${formatNumber(translate)} ${formatNumber(translate)}) scale(${formatNumber(scale)})"${groupFilterAttribute}>\n${usesMarkup}\n  </g>\n</svg>`;
 
 	cache.set(cacheKey, svg);
 	return svg;
