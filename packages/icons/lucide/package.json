@@ -12,8 +12,8 @@
     "./package.json": "./package.json"
   },
   "devDependencies": {
-    "fast-xml-parser": "catalog:",
-    "lucide-static": "catalog:",
-    "svg-path-properties": "catalog:"
+    "fast-xml-parser": "^5.5.5",
+    "lucide-static": "^0.577.0",
+    "svg-path-properties": "^2.0.2"
   }
 }

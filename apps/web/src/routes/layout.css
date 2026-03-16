@@ -45,6 +45,7 @@
   * {
     @apply border-border outline-ring/50;
     box-sizing: border-box;
+    font-family: var(--font-pixel-square);
   }
 
   html,
@@ -83,16 +84,6 @@ a {
   padding: 1rem;
   display: grid;
   gap: 0.9rem;
-}
-
-.top-nav {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 0.95rem 1rem;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
 }
 
 .brand {
@@ -157,12 +148,6 @@ a {
   background: #0d0d10;
 }
 
-.search-wrap {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-}
-
 .search-field {
   flex: 1;
   display: flex;
@@ -201,13 +186,6 @@ a {
   border-radius: 6px;
   border: 1px solid var(--line);
   background: #0f0f12;
-}
-
-.results-note {
-  margin: 0;
-  white-space: nowrap;
-  color: var(--ink-soft);
-  font-size: 0.75rem;
 }
 
 .icon-grid {

@@ -116,154 +116,145 @@
 	}
 </script>
 
-<section class="lucide-page">
-	<header class="top-nav">
-		<div class="brand">
-			<strong>PXIcons</strong>
-			<small>Pixel Icon Platform</small>
-		</div>
-	</header>
+<div class="catalog-shell">
+	<!-- <div class="filter-row" aria-label="Icon package filters"> -->
+	<!-- 	{#each packageFilters as filter (filter.id)} -->
+	<!-- 		<button class="filter-pill active" type="button"> -->
+	<!-- 			<span>{filter.label}</span> -->
+	<!-- 			<small>{filter.count}</small> -->
+	<!-- 		</button> -->
+	<!-- 	{/each} -->
+	<!-- </div> -->
 
-	<div class="catalog-shell">
-		<div class="filter-row" aria-label="Icon package filters">
-			{#each packageFilters as filter (filter.id)}
-				<button class="filter-pill active" type="button">
-					<span>{filter.label}</span>
-					<small>{filter.count}</small>
-				</button>
-			{/each}
-		</div>
-
-		<div class="search-wrap">
-			<label class="search-field" for="icon-search">
-				<input
-					id="icon-search"
-					type="search"
-					placeholder="Search pixel icons..."
-					bind:value={query}
-				/>
-				<kbd>⌘K</kbd>
-			</label>
-			<p class="results-note">{filteredIcons.length} results</p>
-		</div>
-
-		<section class="icon-grid" aria-label="Available pixel icons">
-			{#if filteredIcons.length === 0}
-				<p class="empty-state">No icon matches this query.</p>
-			{/if}
-
-			{#each filteredIcons as icon (icon.id)}
-				<button
-					type="button"
-					class="icon-tile"
-					class:active={selectedId === icon.id}
-					onclick={() => selectIcon(icon)}
-				>
-					<span class="tile-canvas">{@html getGridIconSvg(icon)}</span>
-					<span class="tile-label">{icon.id}</span>
-				</button>
-			{/each}
-		</section>
-
-		<Drawer.Root bind:open={drawerOpen} shouldScaleBackground={false}>
-			{#if selectedIcon}
-				<Drawer.Content class="selected-drawer">
-					<section class="selected-panel" aria-live="polite">
-						<div class="selected-preview">
-							<div class="preview-canvas" style="--pixel-scale: 12;">
-								{@html previewSvg}
-							</div>
-						</div>
-
-						<div class="selected-content">
-							<div class="selected-heading">
-								<h2>{selectedIcon.name}</h2>
-								<div class="selected-heading-actions">
-									<span>24x24 canvas</span>
-									<button
-										type="button"
-										class="close-button"
-										onclick={clearSelection}
-										aria-label="Close"
-									>
-										×
-									</button>
-								</div>
-							</div>
-							<p class="selected-tags">{selectedIcon.tags.join(' · ')}</p>
-
-							<div class="control-grid">
-								<label>
-									Color
-									<input type="color" bind:value={color} />
-								</label>
-
-								<label>
-									Export size <span>{size}px</span>
-									<input type="range" min="64" max="384" step="8" bind:value={size} />
-								</label>
-
-								<div class="shape-control">
-									<span>Pixel shape</span>
-									<div class="shape-options">
-										{#each shapeOptions as candidate (candidate)}
-											<button
-												type="button"
-												class:active={shape === candidate}
-												onclick={() => {
-													shape = candidate;
-												}}
-											>
-												{candidate}
-											</button>
-										{/each}
-									</div>
-								</div>
-
-								<label class="toggle-row">
-									<input type="checkbox" bind:checked={metaballEnabled} />
-									Liquid merge
-								</label>
-
-								<label class:disabled={!metaballEnabled}>
-									Strength <span>{metaballStrength}</span>
-									<input
-										type="range"
-										min="0"
-										max="100"
-										step="1"
-										bind:value={metaballStrength}
-										disabled={!metaballEnabled}
-									/>
-								</label>
-
-								<label class="toggle-row">
-									<input type="checkbox" bind:checked={withBackground} />
-									Use background
-								</label>
-
-								<label class:disabled={!withBackground}>
-									Background
-									<input type="color" bind:value={backgroundColor} disabled={!withBackground} />
-								</label>
-							</div>
-
-							<div class="action-row">
-								<button type="button" onclick={() => copyText(selectedIcon.svg, 'Raw SVG')}>
-									Copy raw SVG
-								</button>
-								<button type="button" onclick={() => copyText(customizedSvg, 'Customized SVG')}>
-									Copy customized SVG
-								</button>
-							</div>
-
-							{#if copyStatus}
-								<p class="copy-status">{copyStatus}</p>
-							{/if}
-						</div>
-					</section>
-				</Drawer.Content>
-			{/if}
-		</Drawer.Root>
+	<div class="flex flex-col">
+		<p class="pl-1 text-sm text-muted-foreground">{filteredIcons.length} results</p>
+		<label class="search-field" for="icon-search">
+			<input
+				id="icon-search"
+				type="search"
+				placeholder="Search pixel icons..."
+				bind:value={query}
+			/>
+			<kbd>⌘K</kbd>
+		</label>
 	</div>
-</section>
+
+	<section class="icon-grid" aria-label="Available pixel icons">
+		{#if filteredIcons.length === 0}
+			<p class="empty-state">No icon matches this query.</p>
+		{/if}
+
+		{#each filteredIcons as icon (icon.id)}
+			<button
+				type="button"
+				class="icon-tile"
+				class:active={selectedId === icon.id}
+				onclick={() => selectIcon(icon)}
+			>
+				<span class="tile-canvas">{@html getGridIconSvg(icon)}</span>
+				<span class="tile-label">{icon.id}</span>
+			</button>
+		{/each}
+	</section>
+
+	<Drawer.Root bind:open={drawerOpen} shouldScaleBackground={false}>
+		{#if selectedIcon}
+			<Drawer.Content class="selected-drawer">
+				<section class="selected-panel" aria-live="polite">
+					<div class="selected-preview">
+						<div class="preview-canvas" style="--pixel-scale: 12;">
+							{@html previewSvg}
+						</div>
+					</div>
+
+					<div class="selected-content">
+						<div class="selected-heading">
+							<h2>{selectedIcon.name}</h2>
+							<div class="selected-heading-actions">
+								<span>24x24 canvas</span>
+								<button
+									type="button"
+									class="close-button"
+									onclick={clearSelection}
+									aria-label="Close"
+								>
+									×
+								</button>
+							</div>
+						</div>
+						<p class="selected-tags">{selectedIcon.tags.join(' · ')}</p>
+
+						<div class="control-grid">
+							<label>
+								Color
+								<input type="color" bind:value={color} />
+							</label>
+
+							<label>
+								Export size <span>{size}px</span>
+								<input type="range" min="64" max="384" step="8" bind:value={size} />
+							</label>
+
+							<div class="shape-control">
+								<span>Pixel shape</span>
+								<div class="shape-options">
+									{#each shapeOptions as candidate (candidate)}
+										<button
+											type="button"
+											class:active={shape === candidate}
+											onclick={() => {
+												shape = candidate;
+											}}
+										>
+											{candidate}
+										</button>
+									{/each}
+								</div>
+							</div>
+
+							<label class="toggle-row">
+								<input type="checkbox" bind:checked={metaballEnabled} />
+								Liquid merge
+							</label>
+
+							<label class:disabled={!metaballEnabled}>
+								Strength <span>{metaballStrength}</span>
+								<input
+									type="range"
+									min="0"
+									max="100"
+									step="1"
+									bind:value={metaballStrength}
+									disabled={!metaballEnabled}
+								/>
+							</label>
+
+							<label class="toggle-row">
+								<input type="checkbox" bind:checked={withBackground} />
+								Use background
+							</label>
+
+							<label class:disabled={!withBackground}>
+								Background
+								<input type="color" bind:value={backgroundColor} disabled={!withBackground} />
+							</label>
+						</div>
+
+						<div class="action-row">
+							<button type="button" onclick={() => copyText(selectedIcon.svg, 'Raw SVG')}>
+								Copy raw SVG
+							</button>
+							<button type="button" onclick={() => copyText(customizedSvg, 'Customized SVG')}>
+								Copy customized SVG
+							</button>
+						</div>
+
+						{#if copyStatus}
+							<p class="copy-status">{copyStatus}</p>
+						{/if}
+					</div>
+				</section>
+			</Drawer.Content>
+		{/if}
+	</Drawer.Root>
+</div>

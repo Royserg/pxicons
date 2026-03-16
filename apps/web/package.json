@@ -17,24 +17,24 @@
 		"gen": "wrangler types"
 	},
 	"devDependencies": {
-		"@lucide/svelte": "catalog:",
+		"@lucide/svelte": "^0.577.0",
 		"@sveltejs/adapter-cloudflare": "^7.2.6",
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"@tailwindcss/vite": "^4.1.18",
-		"bits-ui": "catalog:",
-		"clsx": "catalog:",
+		"bits-ui": "^2.16.3",
+		"clsx": "^2.1.1",
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.4.1",
 		"prettier-plugin-tailwindcss": "^0.7.2",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
-		"tailwind-merge": "catalog:",
-		"tailwind-variants": "catalog:",
+		"tailwind-merge": "^3.5.0",
+		"tailwind-variants": "^3.2.2",
 		"tailwindcss": "^4.1.18",
-		"tw-animate-css": "catalog:",
+		"tw-animate-css": "^1.4.0",
 		"typescript": "^5.9.3",
-		"vaul-svelte": "catalog:",
+		"vaul-svelte": "1.0.0-next.7",
 		"vite": "catalog:",
 		"vite-plugin-devtools-json": "^1.0.0",
 		"vite-plus": "catalog:",
@@ -42,6 +42,6 @@
 	},
 	"dependencies": {
 		"@pxicons/lucide": "workspace:*",
-		"geist-svelte": "catalog:"
+		"geist-svelte": "^1.0.2"
 	}
 }
