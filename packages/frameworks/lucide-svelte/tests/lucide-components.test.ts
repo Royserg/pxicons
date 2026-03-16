@@ -46,6 +46,42 @@ describe('@pxicons/lucide-svelte stroke mapping', () => {
     expect(geometry.pixelInset).toBe(0);
   });
 
+  it('keeps baseline geometry unchanged when pixelGap is explicitly zero', () => {
+    const geometry = resolvePixelGeometry({
+      size: 24,
+      strokeWidth: 2,
+      absoluteStrokeWidth: false,
+      pixelGap: 0
+    });
+
+    expect(geometry.pixelSize).toBe(1);
+    expect(geometry.pixelInset).toBe(0);
+  });
+
+  it('reduces pixel size and increases inset when pixelGap is set', () => {
+    const gapped = resolvePixelGeometry({
+      size: 24,
+      strokeWidth: 2,
+      absoluteStrokeWidth: false,
+      pixelGap: 0.2
+    });
+
+    expect(gapped.pixelSize).toBe(0.8);
+    expect(gapped.pixelInset).toBe(0.1);
+  });
+
+  it('applies stroke width first, then subtracts pixelGap', () => {
+    const geometry = resolvePixelGeometry({
+      size: 24,
+      strokeWidth: 3,
+      absoluteStrokeWidth: false,
+      pixelGap: 0.25
+    });
+
+    expect(geometry.pixelSize).toBe(1.25);
+    expect(geometry.pixelInset).toBe(-0.125);
+  });
+
   it('scales pixel size down and up when strokeWidth changes', () => {
     const thinner = resolvePixelGeometry({ size: 24, strokeWidth: 1, absoluteStrokeWidth: false });
     const thicker = resolvePixelGeometry({ size: 24, strokeWidth: 3, absoluteStrokeWidth: false });
@@ -72,5 +108,6 @@ describe('@pxicons/lucide-svelte stroke mapping', () => {
     expect(iconTemplate).toContain('<title>{title}</title>');
     expect(iconTemplate).toContain('width={size}');
     expect(iconTemplate).toContain('height={size}');
+    expect(iconTemplate).toContain('pixelGap = 0');
   });
 });

@@ -5,6 +5,7 @@ packages:
   - tools/*
 
 catalog:
+  '@tanstack/svelte-virtual': ^3.13.23
   vite: npm:@voidzero-dev/vite-plus-core@latest
   vite-plus: latest
   vitest: npm:@voidzero-dev/vite-plus-test@latest

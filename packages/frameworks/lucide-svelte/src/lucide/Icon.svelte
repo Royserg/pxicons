@@ -11,13 +11,14 @@
     size = 24,
     strokeWidth = 2,
     absoluteStrokeWidth = false,
+    pixelGap = 0,
     iconPixels = [],
     children,
     title,
     ...props
   }: IconProps = $props();
 
-  const pixelGeometry = $derived(resolvePixelGeometry({ size, strokeWidth, absoluteStrokeWidth }));
+  const pixelGeometry = $derived(resolvePixelGeometry({ size, strokeWidth, absoluteStrokeWidth, pixelGap }));
   const pixelSize = $derived(pixelGeometry.pixelSize);
   const pixelInset = $derived(pixelGeometry.pixelInset);
 </script>

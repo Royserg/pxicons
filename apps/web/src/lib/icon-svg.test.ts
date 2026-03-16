@@ -74,6 +74,18 @@ describe('buildCustomizedSvg', () => {
 		expect(roundedSvg).toContain('<rect width="1" height="1" rx="0.24" ry="0.24" />');
 	});
 
+	it('renders inset primitive geometry when pixelGap is enabled', () => {
+		const gappedSquare = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'square',
+			pixelGap: 0.2
+		});
+
+		expect(gappedSquare).toContain('<rect x="0.1" y="0.1" width="0.8" height="0.8" />');
+	});
+
 	it('injects metaball filter only when enabled', () => {
 		const metaballOn = buildCustomizedSvg(settingsIcon, {
 			color: '#ffffff',
@@ -139,6 +151,42 @@ describe('buildCustomizedSvg', () => {
 		expect(extractSymbolId(settingsSquare)).toBe(extractSymbolId(settingsSquareAgain));
 		expect(extractSymbolId(settingsSquare)).not.toBe(extractSymbolId(settingsCircle));
 		expect(extractSymbolId(settingsSquare)).not.toBe(extractSymbolId(searchSquare));
+	});
+
+	it('varies symbol ids by pixelGap value', () => {
+		const noGap = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 1,
+			shape: 'square'
+		});
+		const gapped = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 1,
+			shape: 'square',
+			pixelGap: 0.2
+		});
+
+		expect(extractSymbolId(noGap)).not.toBe(extractSymbolId(gapped));
+	});
+
+	it('keeps output unchanged when pixelGap is explicitly zero', () => {
+		const implicitGap = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'rounded'
+		});
+		const explicitZeroGap = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'rounded',
+			pixelGap: 0
+		});
+
+		expect(explicitZeroGap).toBe(implicitGap);
 	});
 
 	it('creates deterministic filter ids and varies by metaball strength', () => {

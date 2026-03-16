@@ -9,6 +9,7 @@ export interface SvgCustomizationOptions {
 	color: string;
 	size: number;
 	padding: number;
+	pixelGap?: number;
 	backgroundColor?: string;
 	shape?: PixelShape;
 	scope?: RenderScope;
@@ -34,6 +35,14 @@ function clampInteger(value: number, minimum: number): number {
 function clampPadding(value: number): number {
 	const maxPadding = Math.floor(PIXEL_CANVAS_SIZE / 2) - 1;
 	return Math.min(clampInteger(value, 0), maxPadding);
+}
+
+function clampPixelGap(value: number | undefined): number {
+	if (value === undefined || !Number.isFinite(value)) {
+		return 0;
+	}
+
+	return Number(Math.min(0.95, Math.max(0, value)).toFixed(3));
 }
 
 function formatNumber(value: number): string {
@@ -85,15 +94,44 @@ function toSymbolId(iconId: string, shape: PixelShape, signature: string): strin
 	return `px-${fallbackId}-${shape}-${hashText(signature)}`;
 }
 
-function getPrimitiveMarkup(shape: PixelShape): string {
+function resolvePrimitiveGeometry(pixelGap: number): { pixelSize: number; pixelInset: number } {
+	const pixelSize = Number(Math.min(2, Math.max(0.05, 1 - pixelGap)).toFixed(3));
+	const pixelInset = Number(((1 - pixelSize) / 2).toFixed(3));
+
+	return { pixelSize, pixelInset };
+}
+
+function getPrimitiveMarkup(shape: PixelShape, pixelSize: number, pixelInset: number): string {
+	const isDefaultGeometry = pixelSize === 1 && pixelInset === 0;
+
+	if (isDefaultGeometry) {
+		switch (shape) {
+			case 'circle':
+				return '<circle cx="0.5" cy="0.5" r="0.5" />';
+			case 'rounded':
+				return '<rect width="1" height="1" rx="0.24" ry="0.24" />';
+			case 'square':
+			default:
+				return '<rect width="1" height="1" />';
+		}
+	}
+
+	const inset = formatNumber(pixelInset);
+	const size = formatNumber(pixelSize);
+
 	switch (shape) {
-		case 'circle':
-			return '<circle cx="0.5" cy="0.5" r="0.5" />';
-		case 'rounded':
-			return '<rect width="1" height="1" rx="0.24" ry="0.24" />';
+		case 'circle': {
+			const center = formatNumber(pixelInset + pixelSize / 2);
+			const radius = formatNumber(pixelSize / 2);
+			return `<circle cx="${center}" cy="${center}" r="${radius}" />`;
+		}
+		case 'rounded': {
+			const cornerRadius = formatNumber(Math.min(0.24, pixelSize / 2));
+			return `<rect x="${inset}" y="${inset}" width="${size}" height="${size}" rx="${cornerRadius}" ry="${cornerRadius}" />`;
+		}
 		case 'square':
 		default:
-			return '<rect width="1" height="1" />';
+			return `<rect x="${inset}" y="${inset}" width="${size}" height="${size}" />`;
 	}
 }
 
@@ -159,11 +197,12 @@ export function buildCustomizedSvg(icon: PixelIcon, options: SvgCustomizationOpt
 	const color = normalizeColor(options.color, DEFAULT_COLOR);
 	const size = clampInteger(options.size, PIXEL_CANVAS_SIZE);
 	const padding = clampPadding(options.padding);
+	const pixelGap = clampPixelGap(options.pixelGap);
 	const backgroundColor = normalizeColor(options.backgroundColor, '');
 	const shape = normalizeShape(options.shape);
 	const scope = normalizeScope(options.scope);
 	const metaball = normalizeMetaball(options.metaball);
-	const cacheKey = `${icon.id}|${shape}|${color}|${size}|${padding}|${backgroundColor}|mb:${metaball.enabled ? 1 : 0}:${metaball.strength}`;
+	const cacheKey = `${icon.id}|${shape}|${color}|${size}|${padding}|${backgroundColor}|pg:${pixelGap}|mb:${metaball.enabled ? 1 : 0}:${metaball.strength}`;
 	const cache = scope === 'grid' ? gridSvgCache : detailSvgCache;
 
 	const cachedSvg = cache.get(cacheKey);
@@ -177,7 +216,12 @@ export function buildCustomizedSvg(icon: PixelIcon, options: SvgCustomizationOpt
 	const translate = padding;
 	const symbolId = toSymbolId(icon.id, shape, cacheKey);
 	const filterId = toFilterId(icon.id, cacheKey);
-	const primitive = getPrimitiveMarkup(shape);
+	const primitiveGeometry = resolvePrimitiveGeometry(pixelGap);
+	const primitive = getPrimitiveMarkup(
+		shape,
+		primitiveGeometry.pixelSize,
+		primitiveGeometry.pixelInset
+	);
 	const usesMarkup = createUsesMarkup(symbolId, icon.id);
 	const metaballFilter = metaball.enabled
 		? `${createMetaballFilterMarkup(filterId, metaball.strength)}\n`

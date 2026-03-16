@@ -1,15 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
+	import { createVirtualizer } from '@tanstack/svelte-virtual';
 	import { lucideIcons, type PixelIcon, type PixelShape } from '@pxicons/lucide';
+	import { buildGridSvgOptions } from '$lib/icon-grid-render';
 	import { filterPixelIcons } from '$lib/icon-search';
 	import { buildCustomizedSvg } from '$lib/icon-svg';
-	import { computeVirtualGridWindow } from '$lib/icon-grid-window';
+	import { getIconRowCount, getIconsForRow } from '$lib/icon-grid-rows';
 	import * as Drawer from '$lib/components/ui/drawer';
 
 	const icons = lucideIcons;
 	const shapeOptions: PixelShape[] = ['square', 'circle', 'rounded'];
-	const packageFilters = [{ id: 'lucide', label: 'Lucide', count: icons.length }];
-	const GRID_OVERSCAN_ROWS = 4;
+	const GRID_OVERSCAN_ROWS = 6;
 
 	let query = $state('');
 	let selectedId = $state('');
@@ -17,20 +19,18 @@
 	let color = $state('#f3f5f8');
 	let size = $state(192);
 	let shape = $state<PixelShape>('square');
+	let pixelGap = $state(0);
 	let metaballEnabled = $state(false);
 	let metaballStrength = $state(45);
 	let withBackground = $state(false);
 	let backgroundColor = $state('#0f0f10');
 	let copyStatus = $state('');
-	let windowScrollY = $state(0);
-	let viewportHeight = $state(0);
 	let gridWidth = $state(0);
 	let gridGap = $state(8);
 	let tileMinWidth = $state(96);
-	let tileRowHeight = $state(96);
-	let gridOffsetTop = $state(0);
+	let tileRowHeight = $state(95);
 
-	let gridElement: HTMLElement | null = null;
+	let gridViewportElement = $state<HTMLElement | null>(null);
 
 	const filteredIcons = $derived(filterPixelIcons(icons, query));
 	const gridColumns = $derived.by(() => {
@@ -40,18 +40,17 @@
 
 		return Math.max(1, Math.floor((width + safeGap) / (safeTileWidth + safeGap)));
 	});
-	const relativeScrollTop = $derived(Math.max(0, windowScrollY - gridOffsetTop));
-	const virtualWindow = $derived(
-		computeVirtualGridWindow({
-			totalItems: filteredIcons.length,
-			columns: gridColumns,
-			rowHeight: tileRowHeight,
-			viewportHeight: viewportHeight || 720,
-			scrollTop: relativeScrollTop,
-			overscanRows: GRID_OVERSCAN_ROWS
-		})
-	);
-	const visibleIcons = $derived(filteredIcons.slice(virtualWindow.startIndex, virtualWindow.endIndex));
+	const virtualRowCount = $derived(getIconRowCount(filteredIcons.length, gridColumns));
+
+	const rowVirtualizer = createVirtualizer<HTMLElement, HTMLElement>({
+		count: 0,
+		getScrollElement: () => gridViewportElement,
+		estimateSize: () => tileRowHeight + gridGap,
+		overscan: GRID_OVERSCAN_ROWS
+	});
+
+	const virtualRows = $derived($rowVirtualizer.getVirtualItems());
+	const virtualTotalHeight = $derived($rowVirtualizer.getTotalSize());
 
 	const selectedIcon = $derived.by(() => {
 		if (!selectedId) {
@@ -70,6 +69,7 @@
 			color,
 			size,
 			padding: 0,
+			pixelGap,
 			backgroundColor: withBackground ? backgroundColor : '',
 			shape,
 			scope: 'detail'
@@ -85,6 +85,7 @@
 			color,
 			size: 24,
 			padding: 0,
+			pixelGap,
 			backgroundColor: withBackground ? backgroundColor : '',
 			shape,
 			scope: 'detail',
@@ -96,20 +97,17 @@
 	});
 
 	$effect(() => {
+		get(rowVirtualizer).setOptions({
+			count: virtualRowCount,
+			getScrollElement: () => gridViewportElement,
+			estimateSize: () => tileRowHeight + gridGap,
+			overscan: GRID_OVERSCAN_ROWS
+		});
+	});
+
+	$effect(() => {
 		if (selectedId && !filteredIcons.some((icon) => icon.id === selectedId)) {
 			clearSelection();
-		}
-	});
-
-	$effect(() => {
-		void filteredIcons.length;
-		syncGridMetrics();
-	});
-
-	$effect(() => {
-		if (!drawerOpen && selectedId) {
-			selectedId = '';
-			copyStatus = '';
 		}
 	});
 
@@ -126,19 +124,18 @@
 	}
 
 	function syncGridMetrics(): void {
-		if (!gridElement || typeof window === 'undefined') {
+		if (!gridViewportElement) {
 			return;
 		}
 
-		gridWidth = gridElement.clientWidth;
-		gridOffsetTop = gridElement.getBoundingClientRect().top + window.scrollY;
+		gridWidth = gridViewportElement.clientWidth;
 
-		const styles = getComputedStyle(gridElement);
-		const nextGap = Number.parseFloat(styles.rowGap || styles.gap || '8');
+		const styles = getComputedStyle(gridViewportElement);
+		const nextGap = Number.parseFloat(styles.getPropertyValue('--grid-gap'));
 		const nextTileWidth = Number.parseFloat(styles.getPropertyValue('--tile-min-width'));
 		const nextRowHeight = Number.parseFloat(styles.getPropertyValue('--tile-row-height'));
 
-		if (Number.isFinite(nextGap)) {
+		if (Number.isFinite(nextGap) && nextGap >= 0) {
 			gridGap = nextGap;
 		}
 
@@ -151,27 +148,8 @@
 		}
 	}
 
-	function handleViewportChange(): void {
-		if (typeof window === 'undefined') {
-			return;
-		}
-
-		windowScrollY = window.scrollY;
-		viewportHeight = window.innerHeight;
-		syncGridMetrics();
-	}
-
 	function getGridIconSvg(icon: PixelIcon): string {
-		const isSelected = selectedId === icon.id;
-
-		return buildCustomizedSvg(icon, {
-			color: isSelected ? '#fafafa' : '#d6d6d9',
-			size: 24,
-			padding: 0,
-			backgroundColor: '',
-			shape,
-			scope: 'grid'
-		});
+		return buildCustomizedSvg(icon, buildGridSvgOptions(selectedId === icon.id));
 	}
 
 	async function copyText(value: string, label: string): Promise<void> {
@@ -188,41 +166,30 @@
 	}
 
 	onMount(() => {
-		handleViewportChange();
+		syncGridMetrics();
 
 		const resizeObserver =
-			typeof ResizeObserver === 'undefined' || !gridElement
+			typeof ResizeObserver === 'undefined' || !gridViewportElement
 				? null
 				: new ResizeObserver(() => {
 						syncGridMetrics();
-					});
+				  });
 
-		if (resizeObserver && gridElement) {
-			resizeObserver.observe(gridElement);
+		if (resizeObserver && gridViewportElement) {
+			resizeObserver.observe(gridViewportElement);
 		}
 
-		window.addEventListener('scroll', handleViewportChange, { passive: true });
-		window.addEventListener('resize', handleViewportChange);
+		window.addEventListener('resize', syncGridMetrics);
 
 		return () => {
 			resizeObserver?.disconnect();
-			window.removeEventListener('scroll', handleViewportChange);
-			window.removeEventListener('resize', handleViewportChange);
+			window.removeEventListener('resize', syncGridMetrics);
 		};
 	});
 </script>
 
 <div class="catalog-shell">
-	<!-- <div class="filter-row" aria-label="Icon package filters"> -->
-	<!-- 	{#each packageFilters as filter (filter.id)} -->
-	<!-- 		<button class="filter-pill active" type="button"> -->
-	<!-- 			<span>{filter.label}</span> -->
-	<!-- 			<small>{filter.count}</small> -->
-	<!-- 		</button> -->
-	<!-- 	{/each} -->
-	<!-- </div> -->
-
-	<div class="flex flex-col">
+	<div class="catalog-toolbar">
 		<p class="pl-1 text-sm text-muted-foreground">{filteredIcons.length} results</p>
 		<label class="search-field" for="icon-search">
 			<input
@@ -235,37 +202,37 @@
 		</label>
 	</div>
 
-	<section class="icon-grid" aria-label="Available pixel icons" bind:this={gridElement}>
+	<section class="icon-grid-section" aria-label="Available pixel icons">
 		{#if filteredIcons.length === 0}
 			<p class="empty-state">No icon matches this query.</p>
 		{:else}
-			{#if virtualWindow.topSpacerHeight > 0}
-				<div
-					class="grid-spacer"
-					style={`height:${virtualWindow.topSpacerHeight}px`}
-					aria-hidden="true"
-				></div>
-			{/if}
-
-			{#each visibleIcons as icon (icon.id)}
-				<button
-					type="button"
-					class="icon-tile"
-					class:active={selectedId === icon.id}
-					onclick={() => selectIcon(icon)}
-				>
-					<span class="tile-canvas">{@html getGridIconSvg(icon)}</span>
-					<span class="tile-label">{icon.id}</span>
-				</button>
-			{/each}
-
-			{#if virtualWindow.bottomSpacerHeight > 0}
-				<div
-					class="grid-spacer"
-					style={`height:${virtualWindow.bottomSpacerHeight}px`}
-					aria-hidden="true"
-				></div>
-			{/if}
+			<div class="icon-grid-viewport" bind:this={gridViewportElement}>
+				<div class="icon-grid-canvas" style={`height:${Math.max(1, virtualTotalHeight)}px`}>
+					{#each virtualRows as virtualRow (virtualRow.key)}
+						<div
+							class="icon-grid-row-wrapper"
+							style={`transform:translateY(${virtualRow.start}px);height:${virtualRow.size}px`}
+						>
+							<div
+								class="icon-grid-row"
+								style={`--grid-columns:${gridColumns}`}
+							>
+								{#each getIconsForRow(filteredIcons, gridColumns, virtualRow.index) as icon (icon.id)}
+									<button
+										type="button"
+										class="icon-tile"
+										class:active={selectedId === icon.id}
+										onclick={() => selectIcon(icon)}
+									>
+										<span class="tile-canvas">{@html getGridIconSvg(icon)}</span>
+										<span class="tile-label">{icon.id}</span>
+									</button>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
+			</div>
 		{/if}
 	</section>
 
@@ -305,6 +272,11 @@
 							<label>
 								Export size <span>{size}px</span>
 								<input type="range" min="64" max="384" step="8" bind:value={size} />
+							</label>
+
+							<label>
+								Pixel gap <span>{pixelGap.toFixed(2)}</span>
+								<input type="range" min="0" max="0.95" step="0.01" bind:value={pixelGap} />
 							</label>
 
 							<div class="shape-control">
