@@ -56,6 +56,18 @@ describe('buildCustomizedSvg', () => {
 		expect(customized).toContain('transform="translate(3 3) scale(0.75)"');
 	});
 
+	it('omits identity transform on the group when padding keeps 1:1 scale', () => {
+		const customized = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'square'
+		});
+
+		expect(customized).not.toContain('transform="translate(0 0) scale(1)"');
+		expect(customized).not.toMatch(/<g[^>]* transform="/);
+	});
+
 	it('renders primitive geometry for circle and rounded shapes', () => {
 		const circleSvg = buildCustomizedSvg(settingsIcon, {
 			color: '#ffffff',
@@ -162,6 +174,19 @@ describe('buildCustomizedSvg', () => {
 		expect(extractSymbolId(gapped)).toBe('px');
 	});
 
+	it('emits symbol with preserveAspectRatio none for per-use scaling edits', () => {
+		const customized = buildCustomizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'square'
+		});
+
+		expect(customized).toContain(
+			'<symbol id="px" viewBox="0 0 1 1" overflow="visible" preserveAspectRatio="none">'
+		);
+	});
+
 	it('keeps output unchanged when pixelGap is explicitly zero', () => {
 		const implicitGap = buildCustomizedSvg(settingsIcon, {
 			color: '#ffffff',
@@ -244,6 +269,18 @@ describe('buildOptimizedSvg', () => {
 		expect(optimized).not.toContain('<symbol id="');
 		expect(optimized).not.toContain('<use href="#');
 		expect(optimized).toContain('transform="translate(2 2) scale(0.833)"');
+	});
+
+	it('omits identity transform on optimized group when padding keeps 1:1 scale', () => {
+		const optimized = buildOptimizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'square'
+		});
+
+		expect(optimized).not.toContain('transform="translate(0 0) scale(1)"');
+		expect(optimized).not.toMatch(/<g[^>]* transform="/);
 	});
 
 	it('varies optimized output by shape and pixelGap', () => {

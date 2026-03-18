@@ -17,6 +17,9 @@
 		"gen": "wrangler types"
 	},
 	"devDependencies": {
+		"@codemirror/lang-xml": "^6.1.0",
+		"@codemirror/state": "^6.6.0",
+		"@codemirror/view": "^6.40.0",
 		"@lucide/svelte": "^0.577.0",
 		"@sveltejs/adapter-cloudflare": "^7.2.6",
 		"@sveltejs/kit": "^2.50.2",
@@ -24,6 +27,7 @@
 		"@tailwindcss/vite": "^4.1.18",
 		"bits-ui": "^2.16.3",
 		"clsx": "^2.1.1",
+		"jsdom": "^29.0.0",
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.4.1",
 		"prettier-plugin-tailwindcss": "^0.7.2",
@@ -42,7 +46,7 @@
 	},
 	"dependencies": {
 		"@pxicons/lucide": "workspace:*",
-		"@tanstack/svelte-virtual": "catalog:",
+		"@tanstack/svelte-virtual": "^3.13.23",
 		"geist-svelte": "^1.0.2"
 	}
 }

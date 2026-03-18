@@ -429,8 +429,12 @@ function buildRawCustomizedSvg(icon: PixelIcon, options: SvgCustomizationOptions
 	const backgroundRect = context.backgroundColor
 		? `  <rect x="0" y="0" width="${PIXEL_CANVAS_SIZE}" height="${PIXEL_CANVAS_SIZE}" fill="${context.backgroundColor}"/>\n`
 		: '';
+	const hasIdentityTransform = translate === 0 && scale === 1;
+	const groupTransformAttribute = hasIdentityTransform
+		? ''
+		: ` transform="translate(${formatNumber(translate)} ${formatNumber(translate)}) scale(${formatNumber(scale)})"`;
 
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PIXEL_CANVAS_SIZE} ${PIXEL_CANVAS_SIZE}" width="${context.size}" height="${context.size}" fill="none" shape-rendering="${shapeRendering}">\n${backgroundRect}  <defs>\n    <symbol id="${symbolId}" viewBox="0 0 1 1" overflow="visible">\n      ${primitive}\n    </symbol>\n${metaballFilter}  </defs>\n  <g fill="${context.color}" transform="translate(${formatNumber(translate)} ${formatNumber(translate)}) scale(${formatNumber(scale)})"${groupFilterAttribute}>\n${usesMarkup}\n  </g>\n</svg>`;
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PIXEL_CANVAS_SIZE} ${PIXEL_CANVAS_SIZE}" width="${context.size}" height="${context.size}" fill="none" shape-rendering="${shapeRendering}">\n${backgroundRect}  <defs>\n    <symbol id="${symbolId}" viewBox="0 0 1 1" overflow="visible" preserveAspectRatio="none">\n      ${primitive}\n    </symbol>\n${metaballFilter}  </defs>\n  <g fill="${context.color}"${groupTransformAttribute}${groupFilterAttribute}>\n${usesMarkup}\n  </g>\n</svg>`;
 
 	context.cache.set(context.cacheKey, svg);
 	return svg;
@@ -473,8 +477,12 @@ export function buildOptimizedSvg(icon: PixelIcon, options: SvgCustomizationOpti
 	const backgroundRect = context.backgroundColor
 		? `  <rect x="0" y="0" width="${PIXEL_CANVAS_SIZE}" height="${PIXEL_CANVAS_SIZE}" fill="${context.backgroundColor}"/>\n`
 		: '';
+	const hasIdentityTransform = translate === 0 && scale === 1;
+	const groupTransformAttribute = hasIdentityTransform
+		? ''
+		: ` transform="translate(${formatNumber(translate)} ${formatNumber(translate)}) scale(${formatNumber(scale)})"`;
 
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PIXEL_CANVAS_SIZE} ${PIXEL_CANVAS_SIZE}" width="${context.size}" height="${context.size}" fill="none" shape-rendering="${shapeRendering}">\n${backgroundRect}${defsBlock}  <g fill="${context.color}" transform="translate(${formatNumber(translate)} ${formatNumber(translate)}) scale(${formatNumber(scale)})"${groupFilterAttribute}>\n    <path d="${pathData}" />\n  </g>\n</svg>`;
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PIXEL_CANVAS_SIZE} ${PIXEL_CANVAS_SIZE}" width="${context.size}" height="${context.size}" fill="none" shape-rendering="${shapeRendering}">\n${backgroundRect}${defsBlock}  <g fill="${context.color}"${groupTransformAttribute}${groupFilterAttribute}>\n    <path d="${pathData}" />\n  </g>\n</svg>`;
 
 	context.cache.set(context.cacheKey, svg);
 	return svg;
