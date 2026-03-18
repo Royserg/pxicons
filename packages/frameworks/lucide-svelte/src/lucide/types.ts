@@ -4,7 +4,11 @@ import type { Snippet } from 'svelte';
 import type { SVGAttributes, SvelteHTMLElements } from 'svelte/elements';
 
 export type PixelCell = readonly [number, number];
+export type PixelRect = readonly [number, number, number, number];
 export type IconPixels = readonly PixelCell[];
+export type IconRects = readonly PixelRect[];
+export type PixelShape = 'square' | 'circle' | 'rounded';
+export type IconRenderMode = 'auto' | 'raw' | 'optimized';
 
 export interface IconProps extends SVGAttributes<SVGSVGElement> {
   name?: string;
@@ -13,7 +17,10 @@ export interface IconProps extends SVGAttributes<SVGSVGElement> {
   strokeWidth?: number | string;
   absoluteStrokeWidth?: boolean;
   pixelGap?: number | string;
+  shape?: PixelShape;
+  renderMode?: IconRenderMode;
   iconPixels?: IconPixels;
+  iconRects?: IconRects;
   children?: Snippet;
   title?: string;
 }

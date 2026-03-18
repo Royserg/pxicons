@@ -16,13 +16,20 @@ export interface SvgCustomizationOptions {
 	metaball?: MetaballOptions;
 }
 
+export type SvgOutputMode = 'raw' | 'optimized';
+
 const PIXEL_CANVAS_SIZE = 24;
-const DEFAULT_COLOR = '#111111';
+const DEFAULT_COLOR = 'currentColor';
 
 type RenderScope = 'grid' | 'detail';
+type PixelRectRun = readonly [number, number, number, number];
 
-const gridSvgCache = new Map<string, string>();
-const detailSvgCache = new Map<string, string>();
+const gridRawSvgCache = new Map<string, string>();
+const detailRawSvgCache = new Map<string, string>();
+const gridOptimizedSvgCache = new Map<string, string>();
+const detailOptimizedSvgCache = new Map<string, string>();
+const rectRunCache = new Map<string, readonly PixelRectRun[]>();
+const optimizedPathCache = new Map<string, string>();
 
 function clampInteger(value: number, minimum: number): number {
 	if (!Number.isFinite(value)) {
@@ -73,6 +80,14 @@ function normalizeScope(scope: RenderScope | undefined): RenderScope {
 	return 'detail';
 }
 
+function normalizeOutputMode(mode: SvgOutputMode | undefined): SvgOutputMode {
+	if (mode === 'optimized') {
+		return 'optimized';
+	}
+
+	return 'raw';
+}
+
 function hashText(value: string): string {
 	let hash = 2166136261;
 
@@ -84,14 +99,9 @@ function hashText(value: string): string {
 	return (hash >>> 0).toString(36);
 }
 
-function toSymbolId(iconId: string, shape: PixelShape, signature: string): string {
-	const safeIconId = iconId
-		.trim()
-		.toLowerCase()
-		.replace(/[^a-z0-9_-]+/g, '-')
-		.replace(/^-+|-+$/g, '');
-	const fallbackId = safeIconId || 'icon';
-	return `px-${fallbackId}-${shape}-${hashText(signature)}`;
+function toSymbolId(): string {
+	// Symbol definitions are local to one SVG, so a short id is enough.
+	return 'px';
 }
 
 function resolvePrimitiveGeometry(pixelGap: number): { pixelSize: number; pixelInset: number } {
@@ -153,10 +163,7 @@ function createUsesMarkup(symbolId: string, iconId: string): string {
 	}
 
 	return cells
-		.map(
-			([x, y]) =>
-				`    <use href="#${symbolId}" x="${x}" y="${y}" width="1" height="1" />`
-		)
+		.map(([x, y]) => `    <use href="#${symbolId}" x="${x}" y="${y}" width="1" height="1" />`)
 		.join('\n');
 }
 
@@ -193,7 +200,175 @@ function normalizeColor(value: string | undefined, fallback: string): string {
 	return normalized;
 }
 
-export function buildCustomizedSvg(icon: PixelIcon, options: SvgCustomizationOptions): string {
+function createSquareSubpath(x: number, y: number, width: number, height: number): string {
+	return `M${formatNumber(x)} ${formatNumber(y)}h${formatNumber(width)}v${formatNumber(height)}h-${formatNumber(width)}Z`;
+}
+
+function createCircleSubpath(x: number, y: number, size: number): string {
+	const radius = size / 2;
+	const cx = x + radius;
+	const cy = y + radius;
+	const diameter = radius * 2;
+	const radiusText = formatNumber(radius);
+	const diameterText = formatNumber(diameter);
+
+	return `M${formatNumber(cx)} ${formatNumber(cy - radius)}a${radiusText} ${radiusText} 0 1 0 0 ${diameterText}a${radiusText} ${radiusText} 0 1 0 0 -${diameterText}Z`;
+}
+
+function createRoundedSubpath(x: number, y: number, size: number): string {
+	const radius = Math.min(0.24, size / 2);
+
+	if (radius <= 0) {
+		return createSquareSubpath(x, y, size, size);
+	}
+
+	const right = x + size;
+	const bottom = y + size;
+	const radiusText = formatNumber(radius);
+
+	return [
+		`M${formatNumber(x + radius)} ${formatNumber(y)}`,
+		`H${formatNumber(right - radius)}`,
+		`A${radiusText} ${radiusText} 0 0 1 ${formatNumber(right)} ${formatNumber(y + radius)}`,
+		`V${formatNumber(bottom - radius)}`,
+		`A${radiusText} ${radiusText} 0 0 1 ${formatNumber(right - radius)} ${formatNumber(bottom)}`,
+		`H${formatNumber(x + radius)}`,
+		`A${radiusText} ${radiusText} 0 0 1 ${formatNumber(x)} ${formatNumber(bottom - radius)}`,
+		`V${formatNumber(y + radius)}`,
+		`A${radiusText} ${radiusText} 0 0 1 ${formatNumber(x + radius)} ${formatNumber(y)}Z`
+	].join('');
+}
+
+function getRectRuns(iconId: string): readonly PixelRectRun[] {
+	const cached = rectRunCache.get(iconId);
+
+	if (cached) {
+		return cached;
+	}
+
+	const cells = lucidePixelMap[iconId] ?? [];
+	const rows = new Map<number, number[]>();
+
+	for (const [x, y] of cells) {
+		const row = rows.get(y);
+
+		if (row) {
+			row.push(x);
+		} else {
+			rows.set(y, [x]);
+		}
+	}
+
+	const runs: PixelRectRun[] = [];
+	const ys = [...rows.keys()].sort((a, b) => a - b);
+
+	for (const y of ys) {
+		const xs = [...new Set(rows.get(y) ?? [])].sort((a, b) => a - b);
+
+		if (xs.length === 0) {
+			continue;
+		}
+
+		let startX = xs[0];
+		let previousX = xs[0];
+
+		for (let index = 1; index < xs.length; index += 1) {
+			const currentX = xs[index];
+
+			if (currentX === previousX + 1) {
+				previousX = currentX;
+				continue;
+			}
+
+			runs.push([startX, y, previousX - startX + 1, 1]);
+			startX = currentX;
+			previousX = currentX;
+		}
+
+		runs.push([startX, y, previousX - startX + 1, 1]);
+	}
+
+	rectRunCache.set(iconId, runs);
+	return runs;
+}
+
+function createOptimizedPathData(
+	iconId: string,
+	shape: PixelShape,
+	pixelSize: number,
+	pixelInset: number
+): string | null {
+	if (!Number.isFinite(pixelSize) || !Number.isFinite(pixelInset) || pixelSize <= 0) {
+		return null;
+	}
+
+	const cells = lucidePixelMap[iconId] ?? [];
+
+	if (!cells.length) {
+		return '';
+	}
+
+	const key = `${iconId}|${shape}|${formatNumber(pixelSize)}|${formatNumber(pixelInset)}`;
+	const cached = optimizedPathCache.get(key);
+
+	if (cached !== undefined) {
+		return cached;
+	}
+
+	let pathData = '';
+
+	if (shape === 'square' && pixelSize >= 1) {
+		const rectRuns = getRectRuns(iconId);
+		pathData = rectRuns
+			.map(([x, y, width, height]) => {
+				const runX = x + pixelInset;
+				const runY = y + pixelInset;
+				const runWidth = width - 1 + pixelSize;
+				const runHeight = height - 1 + pixelSize;
+				return createSquareSubpath(runX, runY, runWidth, runHeight);
+			})
+			.join('');
+	} else {
+		pathData = cells
+			.map(([x, y]) => {
+				const px = x + pixelInset;
+				const py = y + pixelInset;
+
+				if (shape === 'circle') {
+					return createCircleSubpath(px, py, pixelSize);
+				}
+
+				if (shape === 'rounded') {
+					return createRoundedSubpath(px, py, pixelSize);
+				}
+
+				return createSquareSubpath(px, py, pixelSize, pixelSize);
+			})
+			.join('');
+	}
+
+	optimizedPathCache.set(key, pathData);
+	return pathData;
+}
+
+interface NormalizedSvgBuildContext {
+	color: string;
+	size: number;
+	padding: number;
+	pixelGap: number;
+	backgroundColor: string;
+	shape: PixelShape;
+	scope: RenderScope;
+	metaball: MetaballOptions;
+	cacheKey: string;
+	cache: Map<string, string>;
+}
+
+function normalizeSvgBuildContext(
+	icon: PixelIcon,
+	options: SvgCustomizationOptions,
+	mode: SvgOutputMode
+): NormalizedSvgBuildContext {
 	const color = normalizeColor(options.color, DEFAULT_COLOR);
 	const size = clampInteger(options.size, PIXEL_CANVAS_SIZE);
 	const padding = clampPadding(options.padding);
@@ -202,38 +377,119 @@ export function buildCustomizedSvg(icon: PixelIcon, options: SvgCustomizationOpt
 	const shape = normalizeShape(options.shape);
 	const scope = normalizeScope(options.scope);
 	const metaball = normalizeMetaball(options.metaball);
-	const cacheKey = `${icon.id}|${shape}|${color}|${size}|${padding}|${backgroundColor}|pg:${pixelGap}|mb:${metaball.enabled ? 1 : 0}:${metaball.strength}`;
-	const cache = scope === 'grid' ? gridSvgCache : detailSvgCache;
+	const cacheKey = `${mode}|${icon.id}|${shape}|${color}|${size}|${padding}|${backgroundColor}|pg:${pixelGap}|mb:${metaball.enabled ? 1 : 0}:${metaball.strength}`;
+	const cache =
+		scope === 'grid'
+			? mode === 'optimized'
+				? gridOptimizedSvgCache
+				: gridRawSvgCache
+			: mode === 'optimized'
+				? detailOptimizedSvgCache
+				: detailRawSvgCache;
 
-	const cachedSvg = cache.get(cacheKey);
+	return {
+		color,
+		size,
+		padding,
+		pixelGap,
+		backgroundColor,
+		shape,
+		scope,
+		metaball,
+		cacheKey,
+		cache
+	};
+}
+
+function buildRawCustomizedSvg(icon: PixelIcon, options: SvgCustomizationOptions): string {
+	const context = normalizeSvgBuildContext(icon, options, 'raw');
+	const cachedSvg = context.cache.get(context.cacheKey);
 
 	if (cachedSvg) {
 		return cachedSvg;
 	}
 
-	const drawableSize = Math.max(1, PIXEL_CANVAS_SIZE - padding * 2);
+	const drawableSize = Math.max(1, PIXEL_CANVAS_SIZE - context.padding * 2);
 	const scale = drawableSize / PIXEL_CANVAS_SIZE;
-	const translate = padding;
-	const symbolId = toSymbolId(icon.id, shape, cacheKey);
-	const filterId = toFilterId(icon.id, cacheKey);
-	const primitiveGeometry = resolvePrimitiveGeometry(pixelGap);
+	const translate = context.padding;
+	const symbolId = toSymbolId();
+	const filterId = toFilterId(icon.id, context.cacheKey);
+	const primitiveGeometry = resolvePrimitiveGeometry(context.pixelGap);
 	const primitive = getPrimitiveMarkup(
-		shape,
+		context.shape,
 		primitiveGeometry.pixelSize,
 		primitiveGeometry.pixelInset
 	);
 	const usesMarkup = createUsesMarkup(symbolId, icon.id);
-	const metaballFilter = metaball.enabled
-		? `${createMetaballFilterMarkup(filterId, metaball.strength)}\n`
+	const metaballFilter = context.metaball.enabled
+		? `${createMetaballFilterMarkup(filterId, context.metaball.strength)}\n`
 		: '';
-	const groupFilterAttribute = metaball.enabled ? ` filter="url(#${filterId})"` : '';
-	const shapeRendering = metaball.enabled ? 'geometricPrecision' : 'crispEdges';
-	const backgroundRect = backgroundColor
-		? `  <rect x="0" y="0" width="${PIXEL_CANVAS_SIZE}" height="${PIXEL_CANVAS_SIZE}" fill="${backgroundColor}"/>\n`
+	const groupFilterAttribute = context.metaball.enabled ? ` filter="url(#${filterId})"` : '';
+	const shapeRendering = context.metaball.enabled ? 'geometricPrecision' : 'crispEdges';
+	const backgroundRect = context.backgroundColor
+		? `  <rect x="0" y="0" width="${PIXEL_CANVAS_SIZE}" height="${PIXEL_CANVAS_SIZE}" fill="${context.backgroundColor}"/>\n`
 		: '';
 
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PIXEL_CANVAS_SIZE} ${PIXEL_CANVAS_SIZE}" width="${size}" height="${size}" fill="none" shape-rendering="${shapeRendering}">\n${backgroundRect}  <defs>\n    <symbol id="${symbolId}" viewBox="0 0 1 1" overflow="visible">\n      ${primitive}\n    </symbol>\n${metaballFilter}  </defs>\n  <g fill="${color}" transform="translate(${formatNumber(translate)} ${formatNumber(translate)}) scale(${formatNumber(scale)})"${groupFilterAttribute}>\n${usesMarkup}\n  </g>\n</svg>`;
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PIXEL_CANVAS_SIZE} ${PIXEL_CANVAS_SIZE}" width="${context.size}" height="${context.size}" fill="none" shape-rendering="${shapeRendering}">\n${backgroundRect}  <defs>\n    <symbol id="${symbolId}" viewBox="0 0 1 1" overflow="visible">\n      ${primitive}\n    </symbol>\n${metaballFilter}  </defs>\n  <g fill="${context.color}" transform="translate(${formatNumber(translate)} ${formatNumber(translate)}) scale(${formatNumber(scale)})"${groupFilterAttribute}>\n${usesMarkup}\n  </g>\n</svg>`;
 
-	cache.set(cacheKey, svg);
+	context.cache.set(context.cacheKey, svg);
 	return svg;
+}
+
+export function buildCustomizedSvg(icon: PixelIcon, options: SvgCustomizationOptions): string {
+	return buildRawCustomizedSvg(icon, options);
+}
+
+export function buildOptimizedSvg(icon: PixelIcon, options: SvgCustomizationOptions): string {
+	const context = normalizeSvgBuildContext(icon, options, 'optimized');
+	const cachedSvg = context.cache.get(context.cacheKey);
+
+	if (cachedSvg) {
+		return cachedSvg;
+	}
+
+	const drawableSize = Math.max(1, PIXEL_CANVAS_SIZE - context.padding * 2);
+	const scale = drawableSize / PIXEL_CANVAS_SIZE;
+	const translate = context.padding;
+	const filterId = toFilterId(icon.id, context.cacheKey);
+	const primitiveGeometry = resolvePrimitiveGeometry(context.pixelGap);
+	const pathData = createOptimizedPathData(
+		icon.id,
+		context.shape,
+		primitiveGeometry.pixelSize,
+		primitiveGeometry.pixelInset
+	);
+
+	if (pathData === null) {
+		return buildRawCustomizedSvg(icon, options);
+	}
+
+	const metaballFilter = context.metaball.enabled
+		? `${createMetaballFilterMarkup(filterId, context.metaball.strength)}\n`
+		: '';
+	const defsBlock = metaballFilter ? `  <defs>\n${metaballFilter}  </defs>\n` : '';
+	const groupFilterAttribute = context.metaball.enabled ? ` filter="url(#${filterId})"` : '';
+	const shapeRendering = context.metaball.enabled ? 'geometricPrecision' : 'crispEdges';
+	const backgroundRect = context.backgroundColor
+		? `  <rect x="0" y="0" width="${PIXEL_CANVAS_SIZE}" height="${PIXEL_CANVAS_SIZE}" fill="${context.backgroundColor}"/>\n`
+		: '';
+
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PIXEL_CANVAS_SIZE} ${PIXEL_CANVAS_SIZE}" width="${context.size}" height="${context.size}" fill="none" shape-rendering="${shapeRendering}">\n${backgroundRect}${defsBlock}  <g fill="${context.color}" transform="translate(${formatNumber(translate)} ${formatNumber(translate)}) scale(${formatNumber(scale)})"${groupFilterAttribute}>\n    <path d="${pathData}" />\n  </g>\n</svg>`;
+
+	context.cache.set(context.cacheKey, svg);
+	return svg;
+}
+
+export function buildExportSvg(
+	icon: PixelIcon,
+	options: SvgCustomizationOptions,
+	mode: SvgOutputMode | undefined
+): string {
+	const normalizedMode = normalizeOutputMode(mode);
+
+	if (normalizedMode === 'optimized') {
+		return buildOptimizedSvg(icon, options);
+	}
+
+	return buildRawCustomizedSvg(icon, options);
 }

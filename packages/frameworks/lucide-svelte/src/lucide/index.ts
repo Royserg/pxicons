@@ -4,5 +4,16 @@ export * from './icons/index.js';
 export * as icons from './icons/index.js';
 export { default as defaultAttributes } from './default-attributes.js';
 export { default as Icon } from './Icon.svelte';
+export { resolveOptimizedPathData, normalizeRenderMode, normalizeShape } from './pixel-path.js';
 export { resolvePixelGeometry } from './pixel-stroke.js';
-export type { IconEvents, IconProps, IconSlots, IconPixels, PixelCell } from './types.js';
+export type {
+  IconEvents,
+  IconProps,
+  IconSlots,
+  IconPixels,
+  IconRects,
+  PixelCell,
+  PixelRect,
+  PixelShape,
+  IconRenderMode
+} from './types.js';

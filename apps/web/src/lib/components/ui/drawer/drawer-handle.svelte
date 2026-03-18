@@ -13,7 +13,7 @@
 	bind:ref
 	data-slot="drawer-handle"
 	class={cn(
-		"bg-muted mx-auto mt-4 h-2 w-[100px] shrink-0 rounded-full group-data-[vaul-drawer-direction=bottom]/drawer-content:block",
+		"bg-muted mx-auto mt-3 h-3 w-[132px] shrink-0 rounded-full transition-colors hover:bg-muted/80 cursor-grab active:cursor-grabbing group-data-[vaul-drawer-direction=bottom]/drawer-content:block",
 		className
 	)}
 	{...restProps}

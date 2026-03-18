@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { getLucideIcon, lucidePixelMap } from '@pxicons/lucide';
-import { buildCustomizedSvg } from './icon-svg';
+import { buildCustomizedSvg, buildExportSvg, buildOptimizedSvg } from './icon-svg';
 
 const settingsIcon = getLucideIcon('settings');
 const searchIcon = getLucideIcon('search');
@@ -122,7 +122,7 @@ describe('buildCustomizedSvg', () => {
 		expect(metaballOff).toContain('shape-rendering="crispEdges"');
 	});
 
-	it('creates deterministic and icon-specific symbol ids', () => {
+	it('uses a short local symbol id', () => {
 		const settingsSquare = buildCustomizedSvg(settingsIcon, {
 			color: '#ffffff',
 			size: 96,
@@ -147,19 +147,6 @@ describe('buildCustomizedSvg', () => {
 			padding: 1,
 			shape: 'square'
 		});
-
-		expect(extractSymbolId(settingsSquare)).toBe(extractSymbolId(settingsSquareAgain));
-		expect(extractSymbolId(settingsSquare)).not.toBe(extractSymbolId(settingsCircle));
-		expect(extractSymbolId(settingsSquare)).not.toBe(extractSymbolId(searchSquare));
-	});
-
-	it('varies symbol ids by pixelGap value', () => {
-		const noGap = buildCustomizedSvg(settingsIcon, {
-			color: '#ffffff',
-			size: 96,
-			padding: 1,
-			shape: 'square'
-		});
 		const gapped = buildCustomizedSvg(settingsIcon, {
 			color: '#ffffff',
 			size: 96,
@@ -168,7 +155,11 @@ describe('buildCustomizedSvg', () => {
 			pixelGap: 0.2
 		});
 
-		expect(extractSymbolId(noGap)).not.toBe(extractSymbolId(gapped));
+		expect(extractSymbolId(settingsSquare)).toBe('px');
+		expect(extractSymbolId(settingsSquareAgain)).toBe('px');
+		expect(extractSymbolId(settingsCircle)).toBe('px');
+		expect(extractSymbolId(searchSquare)).toBe('px');
+		expect(extractSymbolId(gapped)).toBe('px');
 	});
 
 	it('keeps output unchanged when pixelGap is explicitly zero', () => {
@@ -237,5 +228,107 @@ describe('buildCustomizedSvg', () => {
 		});
 
 		expect(settingsIcon.svg).toBe(original);
+	});
+});
+
+describe('buildOptimizedSvg', () => {
+	it('renders path-based output without symbol/use primitives', () => {
+		const optimized = buildOptimizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 128,
+			padding: 2,
+			shape: 'square'
+		});
+
+		expect(optimized).toContain('<path d="');
+		expect(optimized).not.toContain('<symbol id="');
+		expect(optimized).not.toContain('<use href="#');
+		expect(optimized).toContain('transform="translate(2 2) scale(0.833)"');
+	});
+
+	it('varies optimized output by shape and pixelGap', () => {
+		const square = buildOptimizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'square'
+		});
+		const circle = buildOptimizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'circle'
+		});
+		const gapped = buildOptimizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'square',
+			pixelGap: 0.2
+		});
+
+		expect(square).not.toBe(circle);
+		expect(square).not.toBe(gapped);
+	});
+
+	it('includes metaball filter markup when enabled', () => {
+		const metaballOn = buildOptimizedSvg(settingsIcon, {
+			color: '#ffffff',
+			size: 96,
+			padding: 0,
+			shape: 'rounded',
+			metaball: {
+				enabled: true,
+				strength: 45
+			}
+		});
+
+		expect(metaballOn).toContain('<filter id="');
+		expect(metaballOn).toContain('<path d="');
+		expect(metaballOn).toContain('filter="url(#');
+	});
+});
+
+describe('buildExportSvg', () => {
+	it('defaults to raw output when mode is undefined', () => {
+		const implicit = buildExportSvg(
+			settingsIcon,
+			{
+				color: '#ffffff',
+				size: 96,
+				padding: 0,
+				shape: 'square'
+			},
+			undefined
+		);
+		const explicitRaw = buildExportSvg(
+			settingsIcon,
+			{
+				color: '#ffffff',
+				size: 96,
+				padding: 0,
+				shape: 'square'
+			},
+			'raw'
+		);
+
+		expect(implicit).toBe(explicitRaw);
+		expect(implicit).toContain('<symbol id="');
+	});
+
+	it('switches to optimized output when mode is optimized', () => {
+		const optimized = buildExportSvg(
+			settingsIcon,
+			{
+				color: '#ffffff',
+				size: 96,
+				padding: 0,
+				shape: 'square'
+			},
+			'optimized'
+		);
+
+		expect(optimized).toContain('<path d="');
+		expect(optimized).not.toContain('<symbol id="');
 	});
 });

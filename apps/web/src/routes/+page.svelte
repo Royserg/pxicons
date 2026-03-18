@@ -2,28 +2,52 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { createVirtualizer } from '@tanstack/svelte-virtual';
-	import { lucideIcons, type PixelIcon, type PixelShape } from '@pxicons/lucide';
+	import { lucideIcons, type PixelIcon } from '@pxicons/lucide';
 	import { buildGridSvgOptions } from '$lib/icon-grid-render';
 	import { filterPixelIcons } from '$lib/icon-search';
-	import { buildCustomizedSvg } from '$lib/icon-svg';
+	import { buildCustomizedSvg, buildExportSvg } from '$lib/icon-svg';
 	import { getIconRowCount, getIconsForRow } from '$lib/icon-grid-rows';
 	import * as Drawer from '$lib/components/ui/drawer';
 
 	const icons = lucideIcons;
-	const shapeOptions: PixelShape[] = ['square', 'circle', 'rounded'];
 	const GRID_OVERSCAN_ROWS = 3;
+	const SEARCH_DEBOUNCE_MS = 180;
+	const SEARCH_LOADING_DELAY_MS = 120;
+	const DETAIL_PREVIEW_COLOR = '#f3f5f8';
+	const CUSTOMIZE_EXPORT_COLOR = 'currentColor';
+	const CUSTOMIZE_PREVIEW_SIZE = 192;
+	const drawerTabs = [
+		{ id: 'usage', label: 'Usage' },
+		{ id: 'customize', label: 'Customize' }
+	] as const;
 
-	let query = $state('');
+	const usageTabs = [
+		{
+			id: 'svelte',
+			label: 'Svelte',
+			language: 'svelte',
+			packageName: '@pxicons/lucide-svelte',
+			snippet: (componentName: string): string => `<script>
+  import { ${componentName} } from '@pxicons/lucide-svelte';
+<\/script>
+
+<${componentName} />`
+		}
+	] as const;
+
+	type DrawerTabId = (typeof drawerTabs)[number]['id'];
+	type UsageTabId = (typeof usageTabs)[number]['id'];
+
+	let queryInput = $state('');
+	let debouncedQuery = $state('');
+	let filteredIcons = $state<readonly PixelIcon[]>([]);
+	let isSearchLoading = $state(true);
 	let selectedId = $state('');
 	let drawerOpen = $state(false);
-	let color = $state('#f3f5f8');
-	let size = $state(192);
-	let shape = $state<PixelShape>('square');
-	let pixelGap = $state(0);
-	let metaballEnabled = $state(false);
-	let metaballStrength = $state(45);
-	let withBackground = $state(false);
-	let backgroundColor = $state('#0f0f10');
+	let activeDrawerTab = $state<DrawerTabId>('usage');
+	let activeUsageTab = $state<UsageTabId>(usageTabs[0].id);
+	let customizeSvgCode = $state('');
+	let customizeSvgSourceIconId = $state('');
 	let copyStatus = $state('');
 	let pendingClearSelection = $state(false);
 	let gridWidth = $state(0);
@@ -31,10 +55,12 @@
 	let tileMinWidth = $state(136);
 	let tileRowHeight = $state(135);
 	let gridIconsSnapshot = $state<readonly PixelIcon[]>(icons);
+	let searchRequestId = 0;
+	let activeLoadingTimer: number | null = null;
+	let activeFilterTimer: number | null = null;
 
 	let gridViewportElement = $state<HTMLElement | null>(null);
 
-	const filteredIcons = $derived(filterPixelIcons(icons, query));
 	const renderedGridIcons = $derived(drawerOpen ? gridIconsSnapshot : filteredIcons);
 	const gridColumns = $derived.by(() => {
 		const safeTileWidth = Math.max(1, tileMinWidth);
@@ -63,20 +89,79 @@
 		return filteredIcons.find((icon) => icon.id === selectedId) ?? null;
 	});
 
-	const customizedSvg = $derived.by(() => {
+	const selectedIconComponentName = $derived.by(() => {
 		if (!selectedIcon) {
 			return '';
 		}
 
-		return buildCustomizedSvg(selectedIcon, {
-			color,
-			size,
-			padding: 0,
-			pixelGap,
-			backgroundColor: withBackground ? backgroundColor : '',
-			shape,
-			scope: 'detail'
-		});
+		return selectedIcon.id
+			.split('-')
+			.filter(Boolean)
+			.map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+			.join('');
+	});
+
+	const activeUsageTabConfig = $derived.by(
+		() => usageTabs.find((tab) => tab.id === activeUsageTab) ?? usageTabs[0]
+	);
+
+	const usageSnippet = $derived.by(() => {
+		if (!selectedIconComponentName) {
+			return '';
+		}
+
+		return activeUsageTabConfig.snippet(selectedIconComponentName);
+	});
+
+	const generatedRawCustomizeSvg = $derived.by(() => {
+		if (!selectedIcon) {
+			return '';
+		}
+
+		return buildExportSvg(
+			selectedIcon,
+			{
+				color: CUSTOMIZE_EXPORT_COLOR,
+				size: CUSTOMIZE_PREVIEW_SIZE,
+				padding: 0,
+				pixelGap: 0,
+				backgroundColor: '',
+				shape: 'square',
+				scope: 'detail'
+			},
+			'raw'
+		);
+	});
+
+	const customizeSvgError = $derived.by(() => {
+		const markup = customizeSvgCode.trim();
+
+		if (!markup) {
+			return 'SVG markup is empty.';
+		}
+
+		if (typeof DOMParser === 'undefined') {
+			return '';
+		}
+
+		const parsedDocument = new DOMParser().parseFromString(markup, 'image/svg+xml');
+		const parserErrorNode = parsedDocument.querySelector('parsererror');
+
+		if (parserErrorNode) {
+			return 'SVG markup is invalid.';
+		}
+
+		return parsedDocument.documentElement.nodeName.toLowerCase() === 'svg'
+			? ''
+			: 'Root element must be <svg>.';
+	});
+
+	const customizeRenderedSvg = $derived.by(() => {
+		if (customizeSvgError) {
+			return generatedRawCustomizeSvg;
+		}
+
+		return customizeSvgCode.trim() || generatedRawCustomizeSvg;
 	});
 
 	const previewSvg = $derived.by(() => {
@@ -85,18 +170,29 @@
 		}
 
 		return buildCustomizedSvg(selectedIcon, {
-			color,
+			color: DETAIL_PREVIEW_COLOR,
 			size: 24,
 			padding: 0,
-			pixelGap,
-			backgroundColor: withBackground ? backgroundColor : '',
-			shape,
-			scope: 'detail',
-			metaball: {
-				enabled: metaballEnabled,
-				strength: metaballStrength
-			}
+			pixelGap: 0,
+			backgroundColor: '',
+			shape: 'square',
+			scope: 'detail'
 		});
+	});
+
+	$effect(() => {
+		const value = queryInput;
+		const debounceTimer = window.setTimeout(() => {
+			debouncedQuery = value;
+		}, SEARCH_DEBOUNCE_MS);
+
+		return () => {
+			window.clearTimeout(debounceTimer);
+		};
+	});
+
+	$effect(() => {
+		queueFilterRun(debouncedQuery);
 	});
 
 	$effect(() => {
@@ -121,10 +217,24 @@
 		}
 	});
 
+	$effect(() => {
+		if (!selectedIcon) {
+			customizeSvgCode = '';
+			customizeSvgSourceIconId = '';
+			return;
+		}
+
+		if (customizeSvgSourceIconId !== selectedIcon.id) {
+			customizeSvgCode = generatedRawCustomizeSvg;
+			customizeSvgSourceIconId = selectedIcon.id;
+		}
+	});
+
 	function selectIcon(icon: PixelIcon): void {
 		pendingClearSelection = false;
 		selectedId = icon.id;
 		drawerOpen = true;
+		activeDrawerTab = 'usage';
 		copyStatus = '';
 	}
 
@@ -142,6 +252,7 @@
 		pendingClearSelection = false;
 		selectedId = '';
 		drawerOpen = false;
+		activeDrawerTab = 'usage';
 		copyStatus = '';
 	}
 
@@ -196,6 +307,56 @@
 		return buildCustomizedSvg(icon, buildGridSvgOptions());
 	}
 
+	function clearPendingSearchTimers(): void {
+		if (activeLoadingTimer !== null) {
+			window.clearTimeout(activeLoadingTimer);
+			activeLoadingTimer = null;
+		}
+
+		if (activeFilterTimer !== null) {
+			window.clearTimeout(activeFilterTimer);
+			activeFilterTimer = null;
+		}
+	}
+
+	function queueFilterRun(nextQuery: string, forceIndicator = false): void {
+		searchRequestId += 1;
+		const requestId = searchRequestId;
+
+		clearPendingSearchTimers();
+
+		if (forceIndicator) {
+			isSearchLoading = true;
+		} else {
+			activeLoadingTimer = window.setTimeout(() => {
+				if (searchRequestId === requestId) {
+					isSearchLoading = true;
+				}
+			}, SEARCH_LOADING_DELAY_MS);
+		}
+
+		activeFilterTimer = window.setTimeout(() => {
+			const nextFilteredIcons = filterPixelIcons(icons, nextQuery);
+
+			if (searchRequestId !== requestId) {
+				return;
+			}
+
+			if (activeLoadingTimer !== null) {
+				window.clearTimeout(activeLoadingTimer);
+				activeLoadingTimer = null;
+			}
+
+			filteredIcons = nextFilteredIcons;
+
+			window.requestAnimationFrame(() => {
+				if (searchRequestId === requestId) {
+					isSearchLoading = false;
+				}
+			});
+		}, 0);
+	}
+
 	async function copyText(value: string, label: string): Promise<void> {
 		if (!value) {
 			return;
@@ -210,44 +371,63 @@
 	}
 
 	onMount(() => {
-		syncGridMetrics();
-
-		const resizeObserver =
-			typeof ResizeObserver === 'undefined' || !gridViewportElement
-				? null
-				: new ResizeObserver(() => {
-						syncGridMetrics();
-				  });
-
-		if (resizeObserver && gridViewportElement) {
-			resizeObserver.observe(gridViewportElement);
-		}
-
+		queueFilterRun(queryInput, true);
 		window.addEventListener('resize', syncGridMetrics);
 
 		return () => {
-			resizeObserver?.disconnect();
+			clearPendingSearchTimers();
 			window.removeEventListener('resize', syncGridMetrics);
+		};
+	});
+
+	$effect(() => {
+		if (!gridViewportElement) {
+			return;
+		}
+
+		syncGridMetrics();
+	});
+
+	$effect(() => {
+		if (typeof ResizeObserver === 'undefined' || !gridViewportElement) {
+			return;
+		}
+
+		const resizeObserver = new ResizeObserver(() => {
+			syncGridMetrics();
+		});
+
+		resizeObserver.observe(gridViewportElement);
+
+		return () => {
+			resizeObserver.disconnect();
 		};
 	});
 </script>
 
 <div class="catalog-shell">
 	<div class="catalog-toolbar">
-		<p class="pl-1 text-sm text-muted-foreground">{renderedGridIcons.length} results</p>
+		<p class="pl-1 text-sm text-muted-foreground">
+			{isSearchLoading ? 'Loading icons...' : `${renderedGridIcons.length} results`}
+		</p>
 		<label class="search-field" for="icon-search">
 			<input
 				id="icon-search"
 				type="search"
 				placeholder="Search pixel icons..."
-				bind:value={query}
+				bind:value={queryInput}
 			/>
 			<kbd>⌘K</kbd>
 		</label>
 	</div>
 
 	<section class="icon-grid-section" aria-label="Available pixel icons">
-		{#if renderedGridIcons.length === 0}
+		{#if isSearchLoading}
+			<div class="loading-state" role="status" aria-live="polite">
+				<span class="loading-swatch" aria-hidden="true"></span>
+				<span>Loading icons...</span>
+			</div>
+		{:else if renderedGridIcons.length === 0}
 			<p class="empty-state">No icon matches this query.</p>
 		{:else}
 			<div class="icon-grid-viewport" class:paused={drawerOpen} bind:this={gridViewportElement}>
@@ -288,109 +468,128 @@
 		shouldScaleBackground={false}
 		onOpenChange={handleDrawerOpenChange}
 		onAnimationEnd={handleDrawerAnimationEnd}
-	>
-		{#if selectedIcon}
-			<Drawer.Content class="selected-drawer">
-				<section class="selected-panel" aria-live="polite">
-					<div class="selected-preview">
-						<div class="preview-canvas" style="--pixel-scale: 12;">
-							{@html previewSvg}
-						</div>
-					</div>
-
-					<div class="selected-content">
-						<div class="selected-heading">
-							<h2>{selectedIcon.name}</h2>
-							<div class="selected-heading-actions">
-								<span>24x24 canvas</span>
-								<button
-									type="button"
-									class="close-button"
-									onclick={requestCloseDrawer}
-									aria-label="Close"
-								>
-									×
-								</button>
+		>
+			{#if selectedIcon}
+				<Drawer.Content class="selected-drawer">
+					<section class="selected-panel" class:customize-active={activeDrawerTab === 'customize'} aria-live="polite">
+						<div class="drawer-top-row">
+							<div class="drawer-tabs" role="tablist" aria-label="Icon detail sections">
+								{#each drawerTabs as tab (tab.id)}
+									<button
+										type="button"
+										id={`drawer-tab-${tab.id}`}
+										role="tab"
+										class:active={activeDrawerTab === tab.id}
+										aria-selected={activeDrawerTab === tab.id}
+										aria-controls={`drawer-panel-${tab.id}`}
+										onclick={() => {
+											activeDrawerTab = tab.id;
+										}}
+									>
+										{tab.label}
+									</button>
+								{/each}
 							</div>
+
+							<h2 class="drawer-icon-name">{selectedIcon.name}</h2>
+
+							<button type="button" class="close-button drawer-close-button" onclick={requestCloseDrawer} aria-label="Close">
+								×
+							</button>
 						</div>
-						<p class="selected-tags">{selectedIcon.tags.join(' · ')}</p>
 
-						<div class="control-grid">
-							<label>
-								Color
-								<input type="color" bind:value={color} />
-							</label>
-
-							<label>
-								Export size <span>{size}px</span>
-								<input type="range" min="64" max="384" step="8" bind:value={size} />
-							</label>
-
-							<label>
-								Pixel gap <span>{pixelGap.toFixed(2)}</span>
-								<input type="range" min="0" max="0.95" step="0.01" bind:value={pixelGap} />
-							</label>
-
-							<div class="shape-control">
-								<span>Pixel shape</span>
-								<div class="shape-options">
-									{#each shapeOptions as candidate (candidate)}
-										<button
-											type="button"
-											class:active={shape === candidate}
-											onclick={() => {
-												shape = candidate;
-											}}
-										>
-											{candidate}
-										</button>
-									{/each}
+						{#if activeDrawerTab === 'usage'}
+							<div class="selected-preview">
+								<div class="preview-canvas" style="--pixel-scale: 12;">
+									{@html previewSvg}
 								</div>
 							</div>
 
-							<label class="toggle-row">
-								<input type="checkbox" bind:checked={metaballEnabled} />
-								Liquid merge
-							</label>
+							<div
+								id="drawer-panel-usage"
+								role="tabpanel"
+								aria-labelledby="drawer-tab-usage"
+								class="selected-content"
+							>
+								<p class="selected-tags">{selectedIcon.tags.join(' · ')}</p>
 
-							<label class:disabled={!metaballEnabled}>
-								Strength <span>{metaballStrength}</span>
-								<input
-									type="range"
-									min="0"
-									max="100"
-									step="1"
-									bind:value={metaballStrength}
-									disabled={!metaballEnabled}
-								/>
-							</label>
+								<div class="usage-card">
+									<div class="usage-tabs" role="tablist" aria-label="Package examples">
+										{#each usageTabs as tab (tab.id)}
+											<button
+												type="button"
+												id={`usage-tab-${tab.id}`}
+												role="tab"
+												class:active={activeUsageTab === tab.id}
+												aria-selected={activeUsageTab === tab.id}
+												aria-controls={`usage-panel-${tab.id}`}
+												onclick={() => {
+													activeUsageTab = tab.id;
+												}}
+											>
+												{tab.label}
+											</button>
+										{/each}
+									</div>
 
-							<label class="toggle-row">
-								<input type="checkbox" bind:checked={withBackground} />
-								Use background
-							</label>
+									<p class="usage-package">{activeUsageTabConfig.packageName}</p>
 
-							<label class:disabled={!withBackground}>
-								Background
-								<input type="color" bind:value={backgroundColor} disabled={!withBackground} />
-							</label>
-						</div>
+									<div class="usage-code-wrap">
+										<div
+											id={`usage-panel-${activeUsageTabConfig.id}`}
+											role="tabpanel"
+											class="usage-panel"
+											aria-labelledby={`usage-tab-${activeUsageTabConfig.id}`}
+										>
+											<pre class="usage-code"><code>{usageSnippet}</code></pre>
+										</div>
+										<span class="usage-lang">{activeUsageTabConfig.language}</span>
+									</div>
+								</div>
 
-						<div class="action-row">
-							<button type="button" onclick={() => copyText(selectedIcon.svg, 'Raw SVG')}>
-								Copy raw SVG
-							</button>
-							<button type="button" onclick={() => copyText(customizedSvg, 'Customized SVG')}>
-								Copy customized SVG
-							</button>
-						</div>
+								<div class="action-row">
+									<button type="button" onclick={() => copyText(selectedIcon.svg, 'Source SVG')}>
+										Copy source SVG
+									</button>
+									<button type="button" onclick={() => copyText(usageSnippet, `${activeUsageTabConfig.label} usage`)}>
+										Copy {activeUsageTabConfig.label} usage
+									</button>
+								</div>
 
-						{#if copyStatus}
-							<p class="copy-status">{copyStatus}</p>
+								{#if copyStatus}
+									<p class="copy-status">{copyStatus}</p>
+								{/if}
+							</div>
+						{:else}
+							<div
+								id="drawer-panel-customize"
+								role="tabpanel"
+								aria-labelledby="drawer-tab-customize"
+								class="customize-editor-pane"
+							>
+								<textarea
+									class="customize-editor"
+									bind:value={customizeSvgCode}
+									spellcheck="false"
+									autocapitalize="off"
+									autocomplete="off"
+									wrap="off"
+								></textarea>
+							</div>
+
+							<section class="customize-output-pane">
+								<div class="customize-output">
+									<div class="customize-output-canvas">
+										{@html customizeRenderedSvg}
+									</div>
+								</div>
+								{#if customizeSvgError}
+									<p class="customize-error">{customizeSvgError}</p>
+								{/if}
+							</section>
 						{/if}
-					</div>
-				</section>
-			</Drawer.Content>
-		{/if}
+					</section>
+				</Drawer.Content>
+			{/if}
 	</Drawer.Root>
 </div>

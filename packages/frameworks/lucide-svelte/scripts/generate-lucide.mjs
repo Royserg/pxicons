@@ -64,13 +64,69 @@ function toPascalCase(iconId) {
     .join('');
 }
 
+function toRectRuns(iconPixels) {
+  const rows = new Map();
+
+  for (const cell of iconPixels) {
+    const x = Number(cell?.[0]);
+    const y = Number(cell?.[1]);
+
+    if (!Number.isInteger(x) || !Number.isInteger(y)) {
+      continue;
+    }
+
+    const row = rows.get(y);
+
+    if (row) {
+      row.push(x);
+    } else {
+      rows.set(y, [x]);
+    }
+  }
+
+  const rectRuns = [];
+  const sortedRows = [...rows.keys()].sort((a, b) => a - b);
+
+  for (const y of sortedRows) {
+    const xs = [...new Set(rows.get(y) ?? [])].sort((a, b) => a - b);
+
+    if (xs.length === 0) {
+      continue;
+    }
+
+    let startX = xs[0];
+    let previousX = xs[0];
+
+    for (let index = 1; index < xs.length; index += 1) {
+      const currentX = xs[index];
+
+      if (currentX === previousX + 1) {
+        previousX = currentX;
+        continue;
+      }
+
+      rectRuns.push([startX, y, previousX - startX + 1, 1]);
+      startX = currentX;
+      previousX = currentX;
+    }
+
+    rectRuns.push([startX, y, previousX - startX + 1, 1]);
+  }
+
+  return rectRuns;
+}
+
 function createTypesFile() {
   return `${GENERATED_HEADER}
 import type { Snippet } from 'svelte';
 import type { SVGAttributes, SvelteHTMLElements } from 'svelte/elements';
 
 export type PixelCell = readonly [number, number];
+export type PixelRect = readonly [number, number, number, number];
 export type IconPixels = readonly PixelCell[];
+export type IconRects = readonly PixelRect[];
+export type PixelShape = 'square' | 'circle' | 'rounded';
+export type IconRenderMode = 'auto' | 'raw' | 'optimized';
 
 export interface IconProps extends SVGAttributes<SVGSVGElement> {
   name?: string;
@@ -79,7 +135,10 @@ export interface IconProps extends SVGAttributes<SVGSVGElement> {
   strokeWidth?: number | string;
   absoluteStrokeWidth?: boolean;
   pixelGap?: number | string;
+  shape?: PixelShape;
+  renderMode?: IconRenderMode;
   iconPixels?: IconPixels;
+  iconRects?: IconRects;
   children?: Snippet;
   title?: string;
 }
@@ -152,6 +211,170 @@ export function resolvePixelGeometry(options: PixelGeometryOptions): PixelGeomet
 `;
 }
 
+function createPixelPathFile() {
+  return `${GENERATED_HEADER}
+import type { IconPixels, IconRects, IconRenderMode, PixelShape } from './types.js';
+
+const optimizedPathCache = new WeakMap<IconPixels, Map<string, string>>();
+
+function formatNumber(value: number): string {
+  const rounded = Math.round(value * 1000) / 1000;
+
+  if (Number.isInteger(rounded)) {
+    return String(rounded);
+  }
+
+  return String(rounded)
+    .replace(/\\.0+$/, '')
+    .replace(/(\\.\\d*?)0+$/, '$1');
+}
+
+function createSquareSubpath(x: number, y: number, width: number, height = width): string {
+  const px = formatNumber(x);
+  const py = formatNumber(y);
+  const widthText = formatNumber(width);
+  const heightText = formatNumber(height);
+
+  return \`M\${px} \${py}h\${widthText}v\${heightText}h-\${widthText}Z\`;
+}
+
+function createCircleSubpath(x: number, y: number, size: number): string {
+  const radius = size / 2;
+  const centerX = x + radius;
+  const centerY = y + radius;
+  const diameter = radius * 2;
+
+  return \`M\${formatNumber(centerX)} \${formatNumber(centerY - radius)}a\${formatNumber(radius)} \${formatNumber(radius)} 0 1 0 0 \${formatNumber(diameter)}a\${formatNumber(radius)} \${formatNumber(radius)} 0 1 0 0 -\${formatNumber(diameter)}Z\`;
+}
+
+function createRoundedSubpath(x: number, y: number, size: number): string {
+  const radius = Math.min(0.24, size / 2);
+
+  if (radius <= 0) {
+    return createSquareSubpath(x, y, size);
+  }
+
+  const right = x + size;
+  const bottom = y + size;
+
+  return [
+    \`M\${formatNumber(x + radius)} \${formatNumber(y)}\`,
+    \`H\${formatNumber(right - radius)}\`,
+    \`A\${formatNumber(radius)} \${formatNumber(radius)} 0 0 1 \${formatNumber(right)} \${formatNumber(y + radius)}\`,
+    \`V\${formatNumber(bottom - radius)}\`,
+    \`A\${formatNumber(radius)} \${formatNumber(radius)} 0 0 1 \${formatNumber(right - radius)} \${formatNumber(bottom)}\`,
+    \`H\${formatNumber(x + radius)}\`,
+    \`A\${formatNumber(radius)} \${formatNumber(radius)} 0 0 1 \${formatNumber(x)} \${formatNumber(bottom - radius)}\`,
+    \`V\${formatNumber(y + radius)}\`,
+    \`A\${formatNumber(radius)} \${formatNumber(radius)} 0 0 1 \${formatNumber(x + radius)} \${formatNumber(y)}Z\`
+  ].join('');
+}
+
+export function normalizeShape(shape: PixelShape | string | undefined): PixelShape {
+  if (shape === 'circle' || shape === 'rounded') {
+    return shape;
+  }
+
+  return 'square';
+}
+
+export function normalizeRenderMode(mode: IconRenderMode | string | undefined): IconRenderMode {
+  if (mode === 'raw' || mode === 'optimized') {
+    return mode;
+  }
+
+  return 'auto';
+}
+
+function getCacheMap(iconPixels: IconPixels): Map<string, string> {
+  const cached = optimizedPathCache.get(iconPixels);
+
+  if (cached) {
+    return cached;
+  }
+
+  const next = new Map<string, string>();
+  optimizedPathCache.set(iconPixels, next);
+  return next;
+}
+
+function createSquarePathFromRuns(iconRects: IconRects, pixelSize: number, pixelInset: number): string {
+  const segments = [];
+
+  for (const [x, y, width, height] of iconRects) {
+    const runX = x + pixelInset;
+    const runY = y + pixelInset;
+    const runWidth = (width - 1) + pixelSize;
+    const runHeight = (height - 1) + pixelSize;
+
+    segments.push(createSquareSubpath(runX, runY, runWidth, runHeight));
+  }
+
+  return segments.join('');
+}
+
+function createPerPixelPath(iconPixels: IconPixels, shape: PixelShape, pixelSize: number, pixelInset: number): string {
+  const segments = [];
+
+  for (const [x, y] of iconPixels) {
+    const px = x + pixelInset;
+    const py = y + pixelInset;
+
+    if (shape === 'circle') {
+      segments.push(createCircleSubpath(px, py, pixelSize));
+      continue;
+    }
+
+    if (shape === 'rounded') {
+      segments.push(createRoundedSubpath(px, py, pixelSize));
+      continue;
+    }
+
+    segments.push(createSquareSubpath(px, py, pixelSize));
+  }
+
+  return segments.join('');
+}
+
+export interface OptimizedPathOptions {
+  iconPixels: IconPixels;
+  iconRects: IconRects;
+  shape: PixelShape;
+  pixelSize: number;
+  pixelInset: number;
+}
+
+export function resolveOptimizedPathData(options: OptimizedPathOptions): string | null {
+  const { iconPixels, iconRects, pixelSize, pixelInset } = options;
+
+  if (iconPixels.length === 0) {
+    return '';
+  }
+
+  if (!Number.isFinite(pixelSize) || !Number.isFinite(pixelInset) || pixelSize <= 0) {
+    return null;
+  }
+
+  const shape = normalizeShape(options.shape);
+  const key = [shape, formatNumber(pixelSize), formatNumber(pixelInset)].join('|');
+  const cache = getCacheMap(iconPixels);
+  const cachedPath = cache.get(key);
+
+  if (cachedPath !== undefined) {
+    return cachedPath;
+  }
+
+  const canUseRuns = shape === 'square' && pixelSize >= 1 && iconRects.length > 0;
+  const pathData = canUseRuns
+    ? createSquarePathFromRuns(iconRects, pixelSize, pixelInset)
+    : createPerPixelPath(iconPixels, shape, pixelSize, pixelInset);
+
+  cache.set(key, pathData);
+  return pathData;
+}
+`;
+}
+
 function createHasA11yPropFile() {
   return `${GENERATED_HEADER}
 const A11Y_ATTRIBUTES = [
@@ -188,6 +411,7 @@ function createIconBaseFile() {
   return `<script lang="ts">
   // This file is auto-generated by scripts/generate-lucide.mjs.
   import defaultAttributes from './default-attributes.js';
+  import { resolveOptimizedPathData, normalizeRenderMode, normalizeShape } from './pixel-path.js';
   import { resolvePixelGeometry } from './pixel-stroke.js';
   import { hasA11yProp } from './utils/hasA11yProp.js';
   import type { IconProps } from './types.js';
@@ -199,7 +423,10 @@ function createIconBaseFile() {
     strokeWidth = 2,
     absoluteStrokeWidth = false,
     pixelGap = 0,
+    shape = 'square',
+    renderMode = 'auto',
     iconPixels = [],
+    iconRects = [],
     children,
     title,
     ...props
@@ -208,6 +435,22 @@ function createIconBaseFile() {
   const pixelGeometry = $derived(resolvePixelGeometry({ size, strokeWidth, absoluteStrokeWidth, pixelGap }));
   const pixelSize = $derived(pixelGeometry.pixelSize);
   const pixelInset = $derived(pixelGeometry.pixelInset);
+  const normalizedShape = $derived(normalizeShape(shape));
+  const normalizedRenderMode = $derived(normalizeRenderMode(renderMode));
+  const roundedCornerRadius = $derived(Number(Math.min(0.24, Math.max(0, pixelSize / 2)).toFixed(3)));
+  const optimizedPathData = $derived(
+    resolveOptimizedPathData({
+      iconPixels,
+      iconRects,
+      shape: normalizedShape,
+      pixelSize,
+      pixelInset
+    })
+  );
+  const canRenderOptimized = $derived(optimizedPathData !== null);
+  const shouldRenderOptimized = $derived(
+    normalizedRenderMode !== 'raw' && canRenderOptimized
+  );
 </script>
 
 <svg
@@ -224,9 +467,32 @@ function createIconBaseFile() {
   {/if}
 
   <g fill={color}>
-    {#each iconPixels as [x, y]}
-      <rect x={x + pixelInset} y={y + pixelInset} width={pixelSize} height={pixelSize} />
-    {/each}
+    {#if shouldRenderOptimized}
+      <path d={optimizedPathData ?? ''} />
+    {:else if normalizedShape === 'circle'}
+      {#each iconPixels as [x, y]}
+        <circle
+          cx={x + pixelInset + pixelSize / 2}
+          cy={y + pixelInset + pixelSize / 2}
+          r={pixelSize / 2}
+        />
+      {/each}
+    {:else if normalizedShape === 'rounded'}
+      {#each iconPixels as [x, y]}
+        <rect
+          x={x + pixelInset}
+          y={y + pixelInset}
+          width={pixelSize}
+          height={pixelSize}
+          rx={roundedCornerRadius}
+          ry={roundedCornerRadius}
+        />
+      {/each}
+    {:else}
+      {#each iconPixels as [x, y]}
+        <rect x={x + pixelInset} y={y + pixelInset} width={pixelSize} height={pixelSize} />
+      {/each}
+    {/if}
   </g>
 
   {@render children?.()}
@@ -240,24 +506,37 @@ export * from './icons/index.js';
 export * as icons from './icons/index.js';
 export { default as defaultAttributes } from './default-attributes.js';
 export { default as Icon } from './Icon.svelte';
+export { resolveOptimizedPathData, normalizeRenderMode, normalizeShape } from './pixel-path.js';
 export { resolvePixelGeometry } from './pixel-stroke.js';
-export type { IconEvents, IconProps, IconSlots, IconPixels, PixelCell } from './types.js';
+export type {
+  IconEvents,
+  IconProps,
+  IconSlots,
+  IconPixels,
+  IconRects,
+  PixelCell,
+  PixelRect,
+  PixelShape,
+  IconRenderMode
+} from './types.js';
 `;
 }
 
-function createIconComponentFile(iconId, iconPixels) {
+function createIconComponentFile(iconId, iconPixels, iconRects) {
   const pixelsLiteral = JSON.stringify(iconPixels);
+  const rectsLiteral = JSON.stringify(iconRects);
 
   return `<script lang="ts">
   // This file is auto-generated by scripts/generate-lucide.mjs.
   import Icon from '../Icon.svelte';
-  import type { IconProps, IconPixels } from '../types.js';
+  import type { IconProps, IconPixels, IconRects } from '../types.js';
 
   let props: IconProps = $props();
   const iconPixels: IconPixels = ${pixelsLiteral};
+  const iconRects: IconRects = ${rectsLiteral};
 </script>
 
-<Icon name="${iconId}" {...props} iconPixels={iconPixels}>
+<Icon name="${iconId}" {...props} iconPixels={iconPixels} iconRects={iconRects}>
   {@render props.children?.()}
 </Icon>
 `;
@@ -311,6 +590,7 @@ async function main() {
       throw new Error(`Missing pixel map for icon id: ${iconId}`);
     }
 
+    const iconRects = toRectRuns(iconPixels);
     const componentName = toPascalCase(iconId);
 
     if (!componentName) {
@@ -322,11 +602,11 @@ async function main() {
     }
 
     seenNames.add(componentName);
-    entries.push({ iconId, componentName, iconPixels });
+    entries.push({ iconId, componentName, iconPixels, iconRects });
 
     await writeFile(
       path.join(iconsOutputDir, `${iconId}.svelte`),
-      createIconComponentFile(iconId, iconPixels)
+      createIconComponentFile(iconId, iconPixels, iconRects)
     );
 
     await writeFile(path.join(iconsOutputDir, `${iconId}.ts`), createIconWrapperFile(iconId));
@@ -335,6 +615,7 @@ async function main() {
   await writeFile(path.join(outputDir, 'types.ts'), createTypesFile());
   await writeFile(path.join(outputDir, 'default-attributes.ts'), createDefaultAttributesFile());
   await writeFile(path.join(outputDir, 'pixel-stroke.ts'), createPixelStrokeFile());
+  await writeFile(path.join(outputDir, 'pixel-path.ts'), createPixelPathFile());
   await writeFile(path.join(utilsOutputDir, 'hasA11yProp.ts'), createHasA11yPropFile());
   await writeFile(path.join(outputDir, 'Icon.svelte'), createIconBaseFile());
   await writeFile(path.join(outputDir, 'index.ts'), createLucideIndexFile());
