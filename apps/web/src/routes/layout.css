@@ -712,10 +712,20 @@ a {
 }
 
 .customize-hint {
-  margin: 0;
-  color: #8f9ab2;
-  font-size: 0.7rem;
-  font-family: var(--font-geist-mono), monospace;
+	margin: 0;
+	color: #8f9ab2;
+	font-size: 0.7rem;
+	font-family: var(--font-geist-mono), monospace;
+}
+
+.framework-build-hint {
+	padding: 0.15rem 0.1rem 0;
+}
+
+.framework-build-hint code {
+	font-family: var(--font-geist-mono), monospace;
+	font-size: 0.68rem;
+	color: #b8c8ea;
 }
 
 .edit-output-tabs {

@@ -30,6 +30,7 @@
     "generate": "node ./scripts/generate-lucide.mjs",
     "build": "vp run generate && svelte-package --input ./src --output ./dist",
     "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test:consistency": "vp test -- --run tests/lucide-consistency.test.ts",
     "test": "vp test",
     "prepublishOnly": "vp run build"
   },

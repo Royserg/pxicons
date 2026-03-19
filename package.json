@@ -5,7 +5,13 @@
   "type": "module",
   "scripts": {
     "ready": "vp fmt && vp lint && vp run test -r && vp run build -r",
-    "dev": "vp run web#dev"
+    "dev": "vp run web#dev",
+    "dev:playground": "vp run lucide-svelte#build && vp run web#dev",
+    "frameworks:generate": "vp run lucide-svelte#generate",
+    "frameworks:drift-check": "vp run lucide-svelte#test:consistency",
+    "frameworks:test": "vp run lucide-svelte#test",
+    "frameworks:build": "vp run lucide-svelte#build",
+    "frameworks:verify": "vp run frameworks:generate && vp run frameworks:drift-check && vp run frameworks:test"
   },
   "devDependencies": {
     "vite-plus": "catalog:"

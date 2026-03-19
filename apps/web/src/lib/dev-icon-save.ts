@@ -1,11 +1,13 @@
 import { access, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { runFrameworkGenerateSync, type FrameworkSyncResult } from './framework-sync';
 
 export interface SaveIconSvgSuccess {
 	ok: true;
 	iconId: string;
 	path: string;
 	savedAt: string;
+	frameworkSync: FrameworkSyncResult;
 }
 
 export interface SaveIconSvgFailure {
@@ -21,6 +23,7 @@ export interface SaveIconSvgInput {
 	iconId: string;
 	svg: unknown;
 	cwd?: string;
+	syncFrameworks?: (repoRoot: string) => Promise<FrameworkSyncResult>;
 }
 
 const ICON_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -134,10 +137,26 @@ export async function saveIconSvgFile(input: SaveIconSvgInput): Promise<SaveIcon
 		};
 	}
 
+	const repoRoot = await findRepoRoot(input.cwd);
+	const fallbackFrameworkSync: FrameworkSyncResult = {
+		status: 'failed',
+		command: 'vp run frameworks:generate',
+		durationMs: 0,
+		message: 'Repository root not found. Framework source sync skipped.'
+	};
+
+	const frameworkSync =
+		repoRoot !== null
+			? await (input.syncFrameworks ?? ((nextRepoRoot) => runFrameworkGenerateSync({ cwd: nextRepoRoot })))(
+					repoRoot
+				)
+			: fallbackFrameworkSync;
+
 	return {
 		ok: true,
 		iconId: input.iconId,
 		path: targetPath,
-		savedAt: new Date().toISOString()
+		savedAt: new Date().toISOString(),
+		frameworkSync
 	};
 }

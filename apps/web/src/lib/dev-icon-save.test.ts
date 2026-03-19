@@ -8,6 +8,7 @@ import {
 	resolveLucideIconSvgPath,
 	saveIconSvgFile
 } from './dev-icon-save';
+import type { FrameworkSyncResult } from './framework-sync';
 
 async function createTempRepo(): Promise<{
 	repoRoot: string;
@@ -32,6 +33,12 @@ async function createTempRepo(): Promise<{
 }
 
 describe('dev-icon-save', () => {
+	const okSyncResult: FrameworkSyncResult = {
+		status: 'ok',
+		command: 'vp run frameworks:generate',
+		durationMs: 11
+	};
+
 	it('validates icon ids with a strict slug format', () => {
 		expect(isValidIconId('settings')).toBe(true);
 		expect(isValidIconId('volume-1')).toBe(true);
@@ -97,19 +104,59 @@ describe('dev-icon-save', () => {
 	it('writes SVG content to the connected icon file', async () => {
 		const repo = await createTempRepo();
 		const nextSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">\n  <rect x="1" y="1" width="1" height="1"/>\n</svg>\n`;
+		const syncCalls: string[] = [];
 
 		try {
 			const result = await saveIconSvgFile({
 				allowWrite: true,
 				iconId: 'settings',
 				svg: nextSvg,
-				cwd: path.join(repo.repoRoot, 'apps/web')
+				cwd: path.join(repo.repoRoot, 'apps/web'),
+				syncFrameworks: async (repoRoot) => {
+					syncCalls.push(repoRoot);
+					return okSyncResult;
+				}
 			});
 
 			expect(result.ok).toBe(true);
 			if (result.ok) {
 				expect(result.path).toBe(path.join(repo.lucideDir, 'settings.svg'));
+				expect(result.frameworkSync).toEqual(okSyncResult);
 			}
+			expect(syncCalls).toEqual([repo.repoRoot]);
+
+			const fileContent = await readFile(path.join(repo.lucideDir, 'settings.svg'), 'utf8');
+			expect(fileContent).toBe(nextSvg);
+		} finally {
+			await repo.cleanup();
+		}
+	});
+
+	it('returns partial success when framework sync fails', async () => {
+		const repo = await createTempRepo();
+		const nextSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"/>\n';
+
+		try {
+			const result = await saveIconSvgFile({
+				allowWrite: true,
+				iconId: 'settings',
+				svg: nextSvg,
+				cwd: path.join(repo.repoRoot, 'apps/web'),
+				syncFrameworks: async () => ({
+					status: 'failed',
+					command: 'vp run frameworks:generate',
+					durationMs: 4,
+					message: 'generation failed'
+				})
+			});
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) {
+				return;
+			}
+
+			expect(result.frameworkSync.status).toBe('failed');
+			expect(result.frameworkSync.message).toBe('generation failed');
 
 			const fileContent = await readFile(path.join(repo.lucideDir, 'settings.svg'), 'utf8');
 			expect(fileContent).toBe(nextSvg);

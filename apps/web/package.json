@@ -46,6 +46,7 @@
 	},
 	"dependencies": {
 		"@pxicons/lucide": "workspace:*",
+		"@pxicons/lucide-svelte": "workspace:*",
 		"@tanstack/svelte-virtual": "^3.13.23",
 		"geist-svelte": "^1.0.2"
 	}

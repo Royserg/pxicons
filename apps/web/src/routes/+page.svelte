@@ -970,6 +970,12 @@
 				error?: string;
 				iconId?: string;
 				savedAt?: string;
+				frameworkSync?: {
+					status?: 'ok' | 'failed';
+					command?: string;
+					durationMs?: number;
+					message?: string;
+				};
 			} | null;
 
 			if (!response.ok) {
@@ -985,9 +991,21 @@
 				customizeSvgCode = svgToSave;
 			}
 			editBaselineSvg = svgToSave;
-			editSaveStatus = payload?.savedAt
-				? `Saved at ${new Date(payload.savedAt).toLocaleTimeString()}.`
-				: 'Saved.';
+			const syncStatus = payload?.frameworkSync?.status;
+			if (syncStatus === 'ok') {
+				const savedPrefix = payload?.savedAt
+					? `Saved and framework sources synced at ${new Date(payload.savedAt).toLocaleTimeString()}.`
+					: 'Saved and framework sources synced.';
+				editSaveStatus = `${savedPrefix} Run \`vp run frameworks:build\` to refresh framework dist (used by package imports/playground).`;
+			} else if (syncStatus === 'failed') {
+				const syncError = payload?.frameworkSync?.message ?? 'framework generation command failed.';
+				editSaveStatus = `Saved SVG, but framework sync failed: ${syncError} Run \`vp run frameworks:generate\` and then \`vp run frameworks:build\`.`;
+			} else {
+				const savedPrefix = payload?.savedAt
+					? `Saved at ${new Date(payload.savedAt).toLocaleTimeString()}.`
+					: 'Saved.';
+				editSaveStatus = `${savedPrefix} Run \`vp run frameworks:build\` to refresh framework dist (used by package imports/playground).`;
+			}
 		} catch (error) {
 			const fallbackMessage = 'Failed to save icon SVG.';
 			editSaveStatus = error instanceof Error && error.message ? error.message : fallbackMessage;
@@ -1243,7 +1261,6 @@
 									</button>
 								</div>
 							</div>
-
 							<SvgCodeEditor
 								class="customize-editor"
 								bind:value={customizeSvgCode}
@@ -1328,6 +1345,11 @@
 									</button>
 								</div>
 							</div>
+							<p class="customize-hint framework-build-hint">
+								Edit saves sync framework source files only. Run
+								<code>vp run frameworks:build</code> to refresh package dist used by consumers and
+								Playground.
+							</p>
 
 							<SvgCodeEditor
 								class="customize-editor"
