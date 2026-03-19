@@ -1,11 +1,12 @@
 <script lang="ts">
+	import { dev } from '$app/environment';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { createVirtualizer } from '@tanstack/svelte-virtual';
 	import { lucideIcons, type PixelIcon } from '@pxicons/lucide';
 	import { buildGridSvgOptions } from '$lib/icon-grid-render';
 	import { filterPixelIcons } from '$lib/icon-search';
-	import { buildCustomizedSvg, buildExportSvg } from '$lib/icon-svg';
+	import { buildCustomizedSvg } from '$lib/icon-svg';
 	import { getIconRowCount, getIconsForRow } from '$lib/icon-grid-rows';
 	import SvgCodeEditor, { type SvgEditorRange } from '$lib/components/svg-code-editor.svelte';
 	import {
@@ -14,6 +15,7 @@
 		normalizeSvgMarkup,
 		type SvgInspectionModel
 	} from '$lib/svg-inspector';
+	import { buildSvgVisualDiff, type SvgVisualDiffResult } from '$lib/svg-visual-diff';
 	import * as Drawer from '$lib/components/ui/drawer';
 
 	const icons = lucideIcons;
@@ -21,11 +23,13 @@
 	const SEARCH_DEBOUNCE_MS = 180;
 	const SEARCH_LOADING_DELAY_MS = 120;
 	const DETAIL_PREVIEW_COLOR = '#f3f5f8';
-	const CUSTOMIZE_EXPORT_COLOR = 'currentColor';
-	const CUSTOMIZE_PREVIEW_SIZE = 192;
+	const GRID_ICON_OPTIONS = buildGridSvgOptions();
+	const SVG_OPEN_TAG_PATTERN = /<svg\b[^>]*>/i;
+	const SVG_FILL_ATTR_PATTERN = /\sfill=(['"]).*?\1/i;
 	const drawerTabs = [
 		{ id: 'usage', label: 'Usage' },
-		{ id: 'customize', label: 'Customize' }
+		{ id: 'customize', label: 'Customize' },
+		...(dev ? ([{ id: 'edit', label: 'Edit' }] as const) : [])
 	] as const;
 
 	const usageTabs = [
@@ -42,8 +46,9 @@
 		}
 	] as const;
 
-	type DrawerTabId = (typeof drawerTabs)[number]['id'];
+	type DrawerTabId = 'usage' | 'customize' | 'edit';
 	type UsageTabId = (typeof usageTabs)[number]['id'];
+	type EditOutputTabId = 'preview' | 'diff';
 	type SvgCodeEditorHandle = {
 		scrollToRange: (range: SvgEditorRange | null) => void;
 	};
@@ -55,6 +60,11 @@
 		errors: [],
 		status: 'invalid'
 	};
+	const EMPTY_VISUAL_DIFF: SvgVisualDiffResult = {
+		status: 'invalid',
+		svg: '',
+		message: 'No SVG selected.'
+	};
 
 	let queryInput = $state('');
 	let debouncedQuery = $state('');
@@ -64,6 +74,7 @@
 	let drawerOpen = $state(false);
 	let activeDrawerTab = $state<DrawerTabId>('usage');
 	let activeUsageTab = $state<UsageTabId>(usageTabs[0].id);
+	let activeEditOutputTab = $state<EditOutputTabId>('preview');
 	let customizeSvgCode = $state('');
 	let customizeSvgSourceIconId = $state('');
 	let inspectMode = $state(false);
@@ -72,6 +83,17 @@
 	let autoNormalizedInInspectSession = $state(false);
 	let lastScrolledMapId = $state<string | null>(null);
 	let pendingScrollToActiveMap = $state(false);
+	let editSvgCode = $state('');
+	let editBaselineSvg = $state('');
+	let editSvgSourceIconId = $state('');
+	let editInspectMode = $state(false);
+	let editActiveMapId = $state<string | null>(null);
+	let editLastEditorCursorOffset = $state<number | null>(null);
+	let editAutoNormalizedInInspectSession = $state(false);
+	let editLastScrolledMapId = $state<string | null>(null);
+	let editPendingScrollToActiveMap = $state(false);
+	let isSavingEditSvg = $state(false);
+	let editSaveStatus = $state('');
 	let copyStatus = $state('');
 	let pendingClearSelection = $state(false);
 	let gridWidth = $state(0);
@@ -85,7 +107,10 @@
 
 	let gridViewportElement = $state<HTMLElement | null>(null);
 	let customizePreviewElement = $state<HTMLDivElement | null>(null);
+	let editPreviewElement = $state<HTMLDivElement | null>(null);
 	let customizeCodeEditor = $state<SvgCodeEditorHandle | null>(null);
+	let editCodeEditor = $state<SvgCodeEditorHandle | null>(null);
+	let runtimeSvgOverrides = $state<Record<string, string>>({});
 
 	const renderedGridIcons = $derived(drawerOpen ? gridIconsSnapshot : filteredIcons);
 	const gridColumns = $derived.by(() => {
@@ -115,6 +140,14 @@
 		return filteredIcons.find((icon) => icon.id === selectedId) ?? null;
 	});
 
+	const selectedIconSourceSvg = $derived.by(() => {
+		if (!selectedIcon) {
+			return '';
+		}
+
+		return runtimeSvgOverrides[selectedIcon.id] ?? selectedIcon.svg;
+	});
+
 	const selectedIconComponentName = $derived.by(() => {
 		if (!selectedIcon) {
 			return '';
@@ -139,32 +172,12 @@
 		return activeUsageTabConfig.snippet(selectedIconComponentName);
 	});
 
-	const generatedRawCustomizeSvg = $derived.by(() => {
-		if (!selectedIcon) {
-			return '';
-		}
-
-		return buildExportSvg(
-			selectedIcon,
-			{
-				color: CUSTOMIZE_EXPORT_COLOR,
-				size: CUSTOMIZE_PREVIEW_SIZE,
-				padding: 0,
-				pixelGap: 0,
-				backgroundColor: '',
-				shape: 'square',
-				scope: 'detail'
-			},
-			'raw'
-		);
-	});
-
 	const customizeSourceSvg = $derived.by(() => {
 		if (customizeSvgCode.length > 0) {
 			return customizeSvgCode;
 		}
 
-		return generatedRawCustomizeSvg;
+		return selectedIconSourceSvg;
 	});
 
 	const customizeInspectionModel = $derived.by(() => {
@@ -199,10 +212,10 @@
 		}
 
 		if (mappingStatus === 'invalid') {
-			return generatedRawCustomizeSvg;
+			return customizeSourceSvg;
 		}
 
-		return customizeInspectionModel.instrumentedSvg || generatedRawCustomizeSvg;
+		return customizeInspectionModel.instrumentedSvg || customizeSourceSvg;
 	});
 
 	const activeMapEntry = $derived.by(() => {
@@ -229,6 +242,12 @@
 			return '';
 		}
 
+		const runtimeOverride = runtimeSvgOverrides[selectedIcon.id];
+
+		if (runtimeOverride) {
+			return withSvgRootFill(runtimeOverride, DETAIL_PREVIEW_COLOR);
+		}
+
 		return buildCustomizedSvg(selectedIcon, {
 			color: DETAIL_PREVIEW_COLOR,
 			size: 24,
@@ -238,6 +257,87 @@
 			shape: 'square',
 			scope: 'detail'
 		});
+	});
+
+	const editSourceSvg = $derived.by(() => {
+		if (editSvgCode.length > 0) {
+			return editSvgCode;
+		}
+
+		return selectedIconSourceSvg;
+	});
+
+	const editInspectionModel = $derived.by(() => {
+		if (!selectedIcon || !editSourceSvg) {
+			return EMPTY_INSPECTION_MODEL;
+		}
+
+		return buildSvgInspectionModel(editSourceSvg);
+	});
+
+	const editMappingStatus = $derived.by(() => editInspectionModel.status);
+
+	const editSvgError = $derived.by(() => {
+		if (editMappingStatus !== 'invalid') {
+			return '';
+		}
+
+		return editInspectionModel.errors[0] ?? 'SVG markup is invalid.';
+	});
+
+	const editUnmappedStatus = $derived.by(() => {
+		if (editMappingStatus !== 'partial') {
+			return '';
+		}
+
+		return editInspectionModel.errors[0] ?? 'Some SVG segments are currently unmapped.';
+	});
+
+	const editRenderedSvg = $derived.by(() => {
+		if (!selectedIcon) {
+			return '';
+		}
+
+		if (editMappingStatus === 'invalid') {
+			return editSourceSvg;
+		}
+
+		return editInspectionModel.instrumentedSvg || editSourceSvg;
+	});
+
+	const editActiveMapEntry = $derived.by(() => {
+		if (!editActiveMapId) {
+			return null;
+		}
+
+		return editInspectionModel.entries.find((entry) => entry.id === editActiveMapId) ?? null;
+	});
+
+	const editActiveEditorRange = $derived.by((): SvgEditorRange | null => {
+		if (!editActiveMapEntry) {
+			return null;
+		}
+
+		return {
+			from: editActiveMapEntry.sourceStart,
+			to: editActiveMapEntry.sourceEnd
+		};
+	});
+
+	const editVisualDiff = $derived.by(() => {
+		if (!selectedIcon || !editBaselineSvg || !editSourceSvg) {
+			return EMPTY_VISUAL_DIFF;
+		}
+
+		return buildSvgVisualDiff(editBaselineSvg, editSourceSvg);
+	});
+
+	const editHasPendingChanges = $derived.by(() => {
+		if (!selectedIcon) {
+			return false;
+		}
+
+		return editSourceSvg !== editBaselineSvg;
 	});
 
 	$effect(() => {
@@ -287,11 +387,23 @@
 			autoNormalizedInInspectSession = false;
 			lastScrolledMapId = null;
 			pendingScrollToActiveMap = false;
+			editSvgCode = '';
+			editBaselineSvg = '';
+			editSvgSourceIconId = '';
+			editInspectMode = false;
+			editActiveMapId = null;
+			editLastEditorCursorOffset = null;
+			editAutoNormalizedInInspectSession = false;
+			editLastScrolledMapId = null;
+			editPendingScrollToActiveMap = false;
+			isSavingEditSvg = false;
+			editSaveStatus = '';
+			activeEditOutputTab = 'preview';
 			return;
 		}
 
 		if (customizeSvgSourceIconId !== selectedIcon.id) {
-			customizeSvgCode = generatedRawCustomizeSvg;
+			customizeSvgCode = selectedIconSourceSvg;
 			customizeSvgSourceIconId = selectedIcon.id;
 			inspectMode = false;
 			activeMapId = null;
@@ -299,6 +411,22 @@
 			autoNormalizedInInspectSession = false;
 			lastScrolledMapId = null;
 			pendingScrollToActiveMap = false;
+		}
+
+		if (editSvgSourceIconId !== selectedIcon.id) {
+			const initialSource = selectedIconSourceSvg;
+			editSvgCode = initialSource;
+			editBaselineSvg = initialSource;
+			editSvgSourceIconId = selectedIcon.id;
+			editInspectMode = false;
+			editActiveMapId = null;
+			editLastEditorCursorOffset = null;
+			editAutoNormalizedInInspectSession = false;
+			editLastScrolledMapId = null;
+			editPendingScrollToActiveMap = false;
+			isSavingEditSvg = false;
+			editSaveStatus = '';
+			activeEditOutputTab = 'preview';
 		}
 	});
 
@@ -311,6 +439,28 @@
 		activeMapId = null;
 		lastScrolledMapId = null;
 		pendingScrollToActiveMap = false;
+	});
+
+	$effect(() => {
+		if (activeDrawerTab === 'edit') {
+			return;
+		}
+
+		editInspectMode = false;
+		editActiveMapId = null;
+		editLastScrolledMapId = null;
+		editPendingScrollToActiveMap = false;
+	});
+
+	$effect(() => {
+		if (activeEditOutputTab === 'preview') {
+			return;
+		}
+
+		editInspectMode = false;
+		editActiveMapId = null;
+		editPendingScrollToActiveMap = false;
+		editLastScrolledMapId = null;
 	});
 
 	$effect(() => {
@@ -328,9 +478,53 @@
 	});
 
 	$effect(() => {
+		if (!editInspectMode) {
+			editAutoNormalizedInInspectSession = false;
+			return;
+		}
+
+		if (editAutoNormalizedInInspectSession) {
+			return;
+		}
+
+		editAutoNormalizedInInspectSession = true;
+		normalizeEditSvg();
+	});
+
+	$effect(() => {
 		const previewElement = customizePreviewElement;
 		const activeId = activeMapId;
 		const rendered = customizeRenderedSvg;
+
+		if (!previewElement || !rendered) {
+			return;
+		}
+
+		const mappedNodes = previewElement.querySelectorAll<SVGElement>('[data-px-node-id]');
+
+		if (!mappedNodes.length) {
+			return;
+		}
+
+		mappedNodes.forEach((node) => {
+			node.classList.remove('px-inspect-active', 'px-inspect-dim');
+
+			if (!activeId) {
+				return;
+			}
+
+			if (node.getAttribute('data-px-node-id') === activeId) {
+				node.classList.add('px-inspect-active');
+			} else {
+				node.classList.add('px-inspect-dim');
+			}
+		});
+	});
+
+	$effect(() => {
+		const previewElement = editPreviewElement;
+		const activeId = editActiveMapId;
+		const rendered = editRenderedSvg;
 
 		if (!previewElement || !rendered) {
 			return;
@@ -376,6 +570,25 @@
 		pendingScrollToActiveMap = false;
 	});
 
+	$effect(() => {
+		if (!editPendingScrollToActiveMap || !editCodeEditor || !editActiveMapEntry) {
+			editLastScrolledMapId = null;
+			return;
+		}
+
+		if (editLastScrolledMapId === editActiveMapEntry.id) {
+			editPendingScrollToActiveMap = false;
+			return;
+		}
+
+		editLastScrolledMapId = editActiveMapEntry.id;
+		editCodeEditor.scrollToRange({
+			from: editActiveMapEntry.sourceStart,
+			to: editActiveMapEntry.sourceEnd
+		});
+		editPendingScrollToActiveMap = false;
+	});
+
 	function normalizeCustomizeSvg(): void {
 		const source = customizeSourceSvg;
 
@@ -394,6 +607,26 @@
 		}
 
 		customizeSvgCode = normalized;
+	}
+
+	function normalizeEditSvg(): void {
+		const source = editSourceSvg;
+
+		if (!source) {
+			return;
+		}
+
+		const normalized = normalizeSvgMarkup(source);
+
+		if (!normalized) {
+			return;
+		}
+
+		if (normalized === source && editSvgCode.length > 0) {
+			return;
+		}
+
+		editSvgCode = normalized;
 	}
 
 	function setActiveMapFromOffset(offset: number | null): void {
@@ -424,6 +657,34 @@
 		setActiveMapFromOffset(offset);
 	}
 
+	function setEditActiveMapFromOffset(offset: number | null): void {
+		if (!selectedIcon || editInspectMode || editMappingStatus === 'invalid') {
+			editActiveMapId = null;
+			return;
+		}
+
+		const entry = findSvgMapEntryByOffset(editInspectionModel.entries, offset);
+		editActiveMapId = entry?.id ?? null;
+	}
+
+	function handleEditEditorHoverOffset(offset: number | null): void {
+		if (editInspectMode) {
+			return;
+		}
+
+		if (offset === null) {
+			setEditActiveMapFromOffset(editLastEditorCursorOffset);
+			return;
+		}
+
+		setEditActiveMapFromOffset(offset);
+	}
+
+	function handleEditEditorCursorOffset(offset: number | null): void {
+		editLastEditorCursorOffset = offset;
+		setEditActiveMapFromOffset(offset);
+	}
+
 	function resolveMapIdFromPreviewTarget(target: EventTarget | null): string | null {
 		if (!(target instanceof Element)) {
 			return null;
@@ -446,12 +707,28 @@
 		activeMapId = resolveMapIdFromPreviewTarget(event.target);
 	}
 
+	function handleEditPreviewPointerMove(event: PointerEvent): void {
+		if (!editInspectMode || editMappingStatus === 'invalid' || activeEditOutputTab !== 'preview') {
+			return;
+		}
+
+		editActiveMapId = resolveMapIdFromPreviewTarget(event.target);
+	}
+
 	function handlePreviewPointerLeave(): void {
 		if (!inspectMode) {
 			return;
 		}
 
 		activeMapId = null;
+	}
+
+	function handleEditPreviewPointerLeave(): void {
+		if (!editInspectMode || activeEditOutputTab !== 'preview') {
+			return;
+		}
+
+		editActiveMapId = null;
 	}
 
 	function toggleInspectMode(): void {
@@ -461,10 +738,19 @@
 		lastScrolledMapId = null;
 	}
 
+	function toggleEditInspectMode(): void {
+		editInspectMode = !editInspectMode;
+		editActiveMapId = null;
+		editPendingScrollToActiveMap = false;
+		editLastScrolledMapId = null;
+	}
+
 	function handlePreviewPointerDown(event: PointerEvent): void {
 		if (!inspectMode || mappingStatus === 'invalid') {
 			return;
 		}
+		event.preventDefault();
+		event.stopPropagation();
 
 		const mapId = resolveMapIdFromPreviewTarget(event.target);
 
@@ -477,12 +763,31 @@
 		pendingScrollToActiveMap = true;
 	}
 
+	function handleEditPreviewPointerDown(event: PointerEvent): void {
+		if (!editInspectMode || editMappingStatus === 'invalid' || activeEditOutputTab !== 'preview') {
+			return;
+		}
+		event.preventDefault();
+		event.stopPropagation();
+
+		const mapId = resolveMapIdFromPreviewTarget(event.target);
+
+		if (!mapId) {
+			return;
+		}
+
+		editActiveMapId = mapId;
+		editInspectMode = false;
+		editPendingScrollToActiveMap = true;
+	}
+
 	function selectIcon(icon: PixelIcon): void {
 		pendingClearSelection = false;
 		selectedId = icon.id;
 		drawerOpen = true;
 		activeDrawerTab = 'usage';
 		copyStatus = '';
+		editSaveStatus = '';
 	}
 
 	function requestCloseDrawer(): void {
@@ -493,6 +798,7 @@
 		pendingClearSelection = true;
 		drawerOpen = false;
 		copyStatus = '';
+		editSaveStatus = '';
 	}
 
 	function clearSelectionImmediately(): void {
@@ -501,6 +807,7 @@
 		drawerOpen = false;
 		activeDrawerTab = 'usage';
 		copyStatus = '';
+		editSaveStatus = '';
 	}
 
 	function handleDrawerOpenChange(open: boolean): void {
@@ -550,8 +857,28 @@
 		}
 	}
 
+	function withSvgRootFill(svg: string, fill: string): string {
+		const svgOpenTag = svg.match(SVG_OPEN_TAG_PATTERN)?.[0];
+
+		if (!svgOpenTag) {
+			return svg;
+		}
+
+		const nextOpenTag = SVG_FILL_ATTR_PATTERN.test(svgOpenTag)
+			? svgOpenTag.replace(SVG_FILL_ATTR_PATTERN, ` fill="${fill}"`)
+			: svgOpenTag.replace('<svg', `<svg fill="${fill}"`);
+
+		return svg.replace(svgOpenTag, nextOpenTag);
+	}
+
 	function getGridIconSvg(icon: PixelIcon): string {
-		return buildCustomizedSvg(icon, buildGridSvgOptions());
+		const runtimeOverride = runtimeSvgOverrides[icon.id];
+
+		if (runtimeOverride) {
+			return withSvgRootFill(runtimeOverride, GRID_ICON_OPTIONS.color);
+		}
+
+		return buildCustomizedSvg(icon, GRID_ICON_OPTIONS);
 	}
 
 	function clearPendingSearchTimers(): void {
@@ -614,6 +941,58 @@
 			copyStatus = `${label} copied to clipboard.`;
 		} catch {
 			copyStatus = `${label} copy failed. Clipboard permission may be blocked.`;
+		}
+	}
+
+	async function saveEditedIcon(): Promise<void> {
+		if (!selectedIcon || !dev || isSavingEditSvg) {
+			return;
+		}
+
+		const svgToSave = editSourceSvg;
+
+		if (!svgToSave || !editHasPendingChanges) {
+			return;
+		}
+
+		isSavingEditSvg = true;
+		editSaveStatus = '';
+
+		try {
+			const response = await fetch(`/api/dev/icons/${encodeURIComponent(selectedIcon.id)}/svg`, {
+				method: 'PUT',
+				headers: {
+					'content-type': 'application/json'
+				},
+				body: JSON.stringify({ svg: svgToSave })
+			});
+			const payload = (await response.json().catch(() => null)) as {
+				error?: string;
+				iconId?: string;
+				savedAt?: string;
+			} | null;
+
+			if (!response.ok) {
+				const message = payload?.error ?? `Save failed with status ${response.status}.`;
+				throw new Error(message);
+			}
+
+			runtimeSvgOverrides = {
+				...runtimeSvgOverrides,
+				[selectedIcon.id]: svgToSave
+			};
+			if (customizeSvgSourceIconId === selectedIcon.id) {
+				customizeSvgCode = svgToSave;
+			}
+			editBaselineSvg = svgToSave;
+			editSaveStatus = payload?.savedAt
+				? `Saved at ${new Date(payload.savedAt).toLocaleTimeString()}.`
+				: 'Saved.';
+		} catch (error) {
+			const fallbackMessage = 'Failed to save icon SVG.';
+			editSaveStatus = error instanceof Error && error.message ? error.message : fallbackMessage;
+		} finally {
+			isSavingEditSvg = false;
 		}
 	}
 
@@ -717,7 +1096,7 @@
 			<Drawer.Content class="selected-drawer">
 				<section
 					class="selected-panel"
-					class:customize-active={activeDrawerTab === 'customize'}
+					class:customize-active={activeDrawerTab !== 'usage'}
 					aria-live="polite"
 				>
 					<div class="drawer-top-row">
@@ -801,7 +1180,7 @@
 							</div>
 
 							<div class="action-row">
-								<button type="button" onclick={() => copyText(selectedIcon.svg, 'Source SVG')}>
+								<button type="button" onclick={() => copyText(selectedIconSourceSvg, 'Source SVG')}>
 									Copy source SVG
 								</button>
 								<button
@@ -816,7 +1195,7 @@
 								<p class="copy-status">{copyStatus}</p>
 							{/if}
 						</div>
-					{:else}
+					{:else if activeDrawerTab === 'customize'}
 						<div
 							id="drawer-panel-customize"
 							role="tabpanel"
@@ -896,6 +1275,136 @@
 							{:else if customizeUnmappedStatus}
 								<p class="customize-hint">{customizeUnmappedStatus}</p>
 							{/if}
+						</section>
+					{:else if dev}
+						<div
+							id="drawer-panel-edit"
+							role="tabpanel"
+							aria-labelledby="drawer-tab-edit"
+							class="customize-editor-pane"
+						>
+							<div class="customize-toolbar">
+								<div
+									class="customize-status"
+									class:invalid={editMappingStatus === 'invalid'}
+									class:partial={editMappingStatus === 'partial'}
+								>
+									{#if editMappingStatus === 'ready'}
+										Inspect map ready
+									{:else if editMappingStatus === 'partial'}
+										Inspect map partial
+									{:else}
+										Inspect map invalid
+									{/if}
+								</div>
+
+								<div class="customize-toolbar-actions">
+									<button type="button" class="customize-tool-button" onclick={normalizeEditSvg}>
+										Normalize
+									</button>
+									<button
+										type="button"
+										class="customize-tool-button inspect-toggle"
+										class:active={editInspectMode}
+										onclick={toggleEditInspectMode}
+										aria-pressed={editInspectMode}
+										title="Toggle inspect mode"
+									>
+										<span class="inspect-icon" aria-hidden="true">
+											<svg viewBox="0 0 16 16" focusable="false">
+												<path d="M6 2h4v2h2v4h-2v2H6V8H4V4h2Z" />
+												<path d="M2 10h2v2h2v2h4v-2h2v-2h2v4H2Z" />
+											</svg>
+										</span>
+										Inspect
+									</button>
+									<button
+										type="button"
+										class="customize-tool-button save-button"
+										onclick={saveEditedIcon}
+										disabled={!editHasPendingChanges || isSavingEditSvg}
+									>
+										{isSavingEditSvg ? 'Saving…' : 'Save'}
+									</button>
+								</div>
+							</div>
+
+							<SvgCodeEditor
+								class="customize-editor"
+								bind:value={editSvgCode}
+								activeRange={editActiveEditorRange}
+								onHoverOffset={handleEditEditorHoverOffset}
+								onCursorOffset={handleEditEditorCursorOffset}
+								bind:this={editCodeEditor}
+							/>
+						</div>
+
+						<section class="customize-output-pane edit-output-pane">
+							<div class="usage-tabs edit-output-tabs" role="tablist" aria-label="Edit output mode">
+								<button
+									type="button"
+									role="tab"
+									class:active={activeEditOutputTab === 'preview'}
+									aria-selected={activeEditOutputTab === 'preview'}
+									onclick={() => {
+										activeEditOutputTab = 'preview';
+									}}
+								>
+									Preview
+								</button>
+								<button
+									type="button"
+									role="tab"
+									class:active={activeEditOutputTab === 'diff'}
+									aria-selected={activeEditOutputTab === 'diff'}
+									onclick={() => {
+										activeEditOutputTab = 'diff';
+									}}
+								>
+									Diff
+								</button>
+							</div>
+
+							<div class="customize-output">
+								{#if activeEditOutputTab === 'preview'}
+									<div
+										class="customize-output-canvas"
+										class:inspect-enabled={editInspectMode}
+										class:map-active={Boolean(editActiveMapId)}
+										role="img"
+										aria-label="Edit icon preview"
+										bind:this={editPreviewElement}
+										onpointermove={handleEditPreviewPointerMove}
+										onpointerleave={handleEditPreviewPointerLeave}
+										onpointerdown={handleEditPreviewPointerDown}
+									>
+										{@html editRenderedSvg}
+									</div>
+								{:else}
+									<div
+										class="customize-output-canvas diff-canvas"
+										role="img"
+										aria-label="Icon visual diff"
+									>
+										{#if editVisualDiff.svg}
+											{@html editVisualDiff.svg}
+										{:else}
+											<p class="diff-placeholder">{editVisualDiff.message}</p>
+										{/if}
+									</div>
+								{/if}
+							</div>
+							<div class="edit-footer-status">
+								{#if editSaveStatus}
+									<p class="customize-hint">{editSaveStatus}</p>
+								{:else if editSvgError}
+									<p class="customize-error">{editSvgError}</p>
+								{:else if editUnmappedStatus}
+									<p class="customize-hint">{editUnmappedStatus}</p>
+								{:else if activeEditOutputTab === 'diff' && editVisualDiff.message}
+									<p class="customize-hint">{editVisualDiff.message}</p>
+								{/if}
+							</div>
 						</section>
 					{/if}
 				</section>

@@ -62,9 +62,22 @@
 		}
 
 		const from = Math.max(0, Math.min(editorView.state.doc.length, range.from));
-		editorView.dispatch({
-			effects: EditorView.scrollIntoView(from, { y: 'center' })
-		});
+		const scroller = editorView.scrollDOM;
+		const block = editorView.lineBlockAt(from);
+		const viewportTop = scroller.scrollTop;
+		const viewportBottom = viewportTop + scroller.clientHeight;
+		const lineTop = block.top;
+		const lineBottom = block.bottom;
+
+		if (lineTop >= viewportTop && lineBottom <= viewportBottom) {
+			return;
+		}
+
+		const centeredTop = Math.max(
+			0,
+			Math.round(lineTop - (scroller.clientHeight - block.height) / 2)
+		);
+		scroller.scrollTop = centeredTop;
 	}
 
 	onMount(() => {

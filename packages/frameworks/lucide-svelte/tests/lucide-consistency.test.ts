@@ -4,6 +4,10 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vite-plus/test';
+import {
+  buildRectRunsFromPixelCells,
+  extractPixelCellsFromSvg
+} from '../../../icons/lucide/svg-geometry.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,27 +35,37 @@ function loadManifestIds(): string[] {
   return manifest.map((entry) => entry.id);
 }
 
-function loadPixelMapIds(): string[] {
-  const pixelMapPath = path.join(lucideDir, 'src/pixel-map.ts');
-  let source = readFileSync(pixelMapPath, 'utf8');
+function readGeneratedIconArrays(iconId: string): { iconPixels: number[][]; iconRects: number[][] } {
+  const source = readFileSync(path.join(packageDir, `src/lucide/icons/${iconId}.svelte`), 'utf8');
+  const pixelsMatch = source.match(/const iconPixels: IconPixels = (\[[\s\S]*?\]);/);
+  const rectsMatch = source.match(/const iconRects: IconRects = (\[[\s\S]*?\]);/);
 
-  source = source
-    .replace(/export type[^\n]*\n/g, '')
-    .replace(/export const lucidePixelMap\s*:[^=]+=/, 'const lucidePixelMap =');
+  if (!pixelsMatch?.[1] || !rectsMatch?.[1]) {
+    throw new Error(`Missing generated geometry constants for ${iconId}.`);
+  }
 
-  const pixelMap = evaluateTsModule(source, 'lucidePixelMap') as Record<string, unknown>;
-  return Object.keys(pixelMap);
+  return {
+    iconPixels: JSON.parse(pixelsMatch[1]) as number[][],
+    iconRects: JSON.parse(rectsMatch[1]) as number[][]
+  };
+}
+
+function normalizeCells(cells: readonly (readonly [number, number])[]): string[] {
+  return [...new Set(cells.map(([x, y]) => `${x},${y}`))].sort();
+}
+
+function normalizeRects(rects: readonly (readonly [number, number, number, number])[]): string[] {
+  return [...new Set(rects.map(([x, y, width, height]) => `${x},${y},${width},${height}`))].sort();
 }
 
 describe('lucide canonical count consistency', () => {
-  it('keeps canonical source, manifest, pixel-map, and generated Svelte components in sync', () => {
+  it('keeps canonical source, manifest, and generated Svelte components in sync', () => {
     const canonicalTags = JSON.parse(
       readFileSync(path.join(lucideDir, 'node_modules/lucide-static/tags.json'), 'utf8')
     ) as Record<string, string[]>;
 
     const canonicalIds = Object.keys(canonicalTags).sort((a, b) => a.localeCompare(b));
     const manifestIds = loadManifestIds().sort((a, b) => a.localeCompare(b));
-    const pixelMapIds = loadPixelMapIds().sort((a, b) => a.localeCompare(b));
     const generatedSvelteIcons = readdirSync(path.join(packageDir, 'src/lucide/icons'))
       .filter((fileName) => fileName.endsWith('.svelte'))
       .map((fileName) => fileName.replace(/\.svelte$/i, ''))
@@ -59,11 +73,9 @@ describe('lucide canonical count consistency', () => {
 
     expect(canonicalIds).toHaveLength(1703);
     expect(manifestIds).toHaveLength(1703);
-    expect(pixelMapIds).toHaveLength(1703);
     expect(generatedSvelteIcons).toHaveLength(1703);
 
     expect(manifestIds).toEqual(canonicalIds);
-    expect(pixelMapIds).toEqual(canonicalIds);
     expect(generatedSvelteIcons).toEqual(canonicalIds);
   });
 
@@ -77,5 +89,26 @@ describe('lucide canonical count consistency', () => {
     expect(manifestIds.has('home')).toBe(false);
     expect(manifestIds.has('stop-circle')).toBe(false);
     expect(manifestIds.has('unlock')).toBe(false);
+  });
+
+  it('matches generated component geometry to source SVG for representative icons', () => {
+    const sampleIds = ['activity', 'settings', 'a-large-small'];
+
+    for (const iconId of sampleIds) {
+      const sourceSvg = readFileSync(path.join(lucideDir, `${iconId}.svg`), 'utf8');
+      const sourceCells = extractPixelCellsFromSvg(sourceSvg);
+      const sourceRects = buildRectRunsFromPixelCells(sourceCells);
+      const generated = readGeneratedIconArrays(iconId);
+
+      const generatedCells = generated.iconPixels.map(
+        ([x, y]) => [x, y] as const
+      );
+      const generatedRects = generated.iconRects.map(
+        ([x, y, width, height]) => [x, y, width, height] as const
+      );
+
+      expect(normalizeCells(generatedCells)).toEqual(normalizeCells(sourceCells));
+      expect(normalizeRects(generatedRects)).toEqual(normalizeRects(sourceRects));
+    }
   });
 });

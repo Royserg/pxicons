@@ -1,9 +1,14 @@
 /// <reference path="./raw-svg.d.ts" />
 
 import { iconManifest } from './icon-manifest';
-import { lucidePixelMap } from './pixel-map';
-export { lucidePixelMap };
-export type { PixelCell } from './pixel-map';
+import { extractPixelCellsFromSvg } from '../svg-geometry.mjs';
+export {
+  buildRectRunsFromPixelCells,
+  extractPixelCellsFromSvg,
+  extractPixelRectRunsFromSvg
+} from '../svg-geometry.mjs';
+export type { PixelCell, PixelRectRun } from '../svg-geometry.mjs';
+import type { PixelCell } from '../svg-geometry.mjs';
 
 const rawSvgModules = import.meta.glob('../*.svg', {
   query: '?raw',
@@ -40,6 +45,15 @@ export const lucideSvgMap: Readonly<Record<string, string>> = Object.freeze(
 );
 
 export const settingsSvg = lucideSvgMap.settings ?? '';
+
+export const lucidePixelMap: Readonly<Record<string, readonly PixelCell[]>> = Object.freeze(
+  Object.fromEntries(
+    iconManifest.map((entry) => {
+      const svg = lucideSvgMap[entry.id] ?? '';
+      return [entry.id, extractPixelCellsFromSvg(svg)];
+    })
+  )
+);
 
 export const lucideIcons: readonly PixelIcon[] = Object.freeze(
   iconManifest

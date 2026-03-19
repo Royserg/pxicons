@@ -2,11 +2,16 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import {
+  buildRectRunsFromPixelCells,
+  extractPixelCellsFromSvg
+} from '../../../icons/lucide/svg-geometry.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const packageDir = path.resolve(__dirname, '..');
-const sourceDir = path.resolve(packageDir, '../../icons/lucide/src');
+const lucideDir = path.resolve(packageDir, '../../icons/lucide');
+const sourceDir = path.join(lucideDir, 'src');
 const outputDir = path.join(packageDir, 'src/lucide');
 const iconsOutputDir = path.join(outputDir, 'icons');
 const utilsOutputDir = path.join(outputDir, 'utils');
@@ -39,21 +44,18 @@ async function loadManifest() {
   return manifest;
 }
 
-async function loadPixelMap() {
-  const pixelMapPath = path.join(sourceDir, 'pixel-map.ts');
-  let source = await fs.readFile(pixelMapPath, 'utf8');
+async function loadRawSvgMap() {
+  const entries = await fs.readdir(lucideDir, { withFileTypes: true });
+  const svgEntries = entries.filter((entry) => entry.isFile() && entry.name.endsWith('.svg'));
+  const svgMap = new Map();
 
-  source = source
-    .replace(/export type[^\n]*\n/g, '')
-    .replace(/export const lucidePixelMap\s*:[^=]+=/, 'const lucidePixelMap =');
-
-  const pixelMap = evaluateTsModule(source, 'lucidePixelMap');
-
-  if (!pixelMap || typeof pixelMap !== 'object') {
-    throw new Error('Could not parse lucidePixelMap from @pxicons/lucide.');
+  for (const entry of svgEntries) {
+    const iconId = entry.name.replace(/\.svg$/i, '');
+    const svgContent = await fs.readFile(path.join(lucideDir, entry.name), 'utf8');
+    svgMap.set(iconId, svgContent);
   }
 
-  return pixelMap;
+  return svgMap;
 }
 
 function toPascalCase(iconId) {
@@ -62,58 +64,6 @@ function toPascalCase(iconId) {
     .filter(Boolean)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join('');
-}
-
-function toRectRuns(iconPixels) {
-  const rows = new Map();
-
-  for (const cell of iconPixels) {
-    const x = Number(cell?.[0]);
-    const y = Number(cell?.[1]);
-
-    if (!Number.isInteger(x) || !Number.isInteger(y)) {
-      continue;
-    }
-
-    const row = rows.get(y);
-
-    if (row) {
-      row.push(x);
-    } else {
-      rows.set(y, [x]);
-    }
-  }
-
-  const rectRuns = [];
-  const sortedRows = [...rows.keys()].sort((a, b) => a - b);
-
-  for (const y of sortedRows) {
-    const xs = [...new Set(rows.get(y) ?? [])].sort((a, b) => a - b);
-
-    if (xs.length === 0) {
-      continue;
-    }
-
-    let startX = xs[0];
-    let previousX = xs[0];
-
-    for (let index = 1; index < xs.length; index += 1) {
-      const currentX = xs[index];
-
-      if (currentX === previousX + 1) {
-        previousX = currentX;
-        continue;
-      }
-
-      rectRuns.push([startX, y, previousX - startX + 1, 1]);
-      startX = currentX;
-      previousX = currentX;
-    }
-
-    rectRuns.push([startX, y, previousX - startX + 1, 1]);
-  }
-
-  return rectRuns;
 }
 
 function createTypesFile() {
@@ -569,7 +519,7 @@ async function writeFile(filePath, content) {
 }
 
 async function main() {
-  const [manifest, pixelMap] = await Promise.all([loadManifest(), loadPixelMap()]);
+  const [manifest, rawSvgMap] = await Promise.all([loadManifest(), loadRawSvgMap()]);
 
   await ensureEmptyDirectory(iconsOutputDir);
   await ensureEmptyDirectory(utilsOutputDir);
@@ -584,13 +534,19 @@ async function main() {
       continue;
     }
 
-    const iconPixels = pixelMap[iconId];
+    const sourceSvg = rawSvgMap.get(iconId);
 
-    if (!Array.isArray(iconPixels) || iconPixels.length === 0) {
-      throw new Error(`Missing pixel map for icon id: ${iconId}`);
+    if (!sourceSvg) {
+      throw new Error(`Missing source svg for icon id: ${iconId}`);
     }
 
-    const iconRects = toRectRuns(iconPixels);
+    const iconPixels = extractPixelCellsFromSvg(sourceSvg);
+
+    if (iconPixels.length === 0) {
+      throw new Error(`Missing pixel geometry for icon id: ${iconId}`);
+    }
+
+    const iconRects = buildRectRunsFromPixelCells(iconPixels);
     const componentName = toPascalCase(iconId);
 
     if (!componentName) {

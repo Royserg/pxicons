@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { XMLParser } from 'fast-xml-parser';
 import { svgPathProperties } from 'svg-path-properties';
+import { extractPixelCellsFromSvg } from '../svg-geometry.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,7 +12,6 @@ const packageDir = path.resolve(__dirname, '..');
 const sourceDir = path.join(packageDir, 'node_modules/lucide-static/icons');
 const tagsPath = path.join(packageDir, 'node_modules/lucide-static/tags.json');
 const manifestPath = path.join(packageDir, 'src/icon-manifest.ts');
-const pixelMapPath = path.join(packageDir, 'src/pixel-map.ts');
 const defaultReportPath = path.join(packageDir, 'reports/conversion-report.json');
 
 const NO_OVERWRITE = new Set(['settings']);
@@ -421,11 +421,20 @@ function gridToPixelCells(grid) {
   return cells;
 }
 
-function renderPixelSvg(rects) {
-  const lines = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'];
+export function renderPixelSvg(rects) {
+  const lines = [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges">',
+    '  <defs>',
+    '    <symbol id="px" viewBox="0 0 1 1" overflow="visible" preserveAspectRatio="none">',
+    '      <rect width="1" height="1" />',
+    '    </symbol>',
+    '  </defs>'
+  ];
 
   for (const rect of rects) {
-    lines.push(`  <rect x="${rect.x}" y="${rect.y}" width="${rect.width}" height="1"/>`);
+    lines.push(
+      `  <use href="#px" x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}"/>`
+    );
   }
 
   lines.push('</svg>');
@@ -433,44 +442,8 @@ function renderPixelSvg(rects) {
   return `${lines.join('\n')}\n`;
 }
 
-function extractCellsFromPixelSvg(svgContent) {
-  const parsed = parser.parse(svgContent);
-  const svgNode = parsed.svg;
-
-  if (!svgNode?.rect) {
-    return [];
-  }
-
-  const rects = normalizeList(svgNode.rect);
-  const seen = new Set();
-
-  for (const rect of rects) {
-    const startX = Math.round(parseNumber(rect.x, 0));
-    const startY = Math.round(parseNumber(rect.y, 0));
-    const width = Math.max(1, Math.round(parseNumber(rect.width, 1)));
-    const height = Math.max(1, Math.round(parseNumber(rect.height, 1)));
-
-    for (let y = startY; y < startY + height; y += 1) {
-      if (y < 0 || y >= 24) {
-        continue;
-      }
-
-      for (let x = startX; x < startX + width; x += 1) {
-        if (x < 0 || x >= 24) {
-          continue;
-        }
-
-        seen.add(`${x},${y}`);
-      }
-    }
-  }
-
-  return [...seen]
-    .map((cell) => {
-      const [x, y] = cell.split(',').map((value) => Number.parseInt(value, 10));
-      return [x, y];
-    })
-    .sort(([ax, ay], [bx, by]) => ay - by || ax - bx);
+export function extractCellsFromPixelSvg(svgContent) {
+  return extractPixelCellsFromSvg(svgContent).map(([x, y]) => [x, y]);
 }
 
 function sanitizeTag(tag) {
@@ -740,48 +713,35 @@ async function readExistingManifestMap(canonicalIdSet) {
   }
 }
 
-async function readExistingPixelMap(canonicalIdSet) {
-  try {
-    let source = await fs.readFile(pixelMapPath, 'utf8');
+async function readExistingSvgCellMap(canonicalIdSet) {
+  const map = new Map();
 
-    source = source
-      .replace(/export type[^\n]*\n/g, '')
-      .replace(/export const lucidePixelMap\s*:[^=]+=/, 'const lucidePixelMap =');
+  for (const id of canonicalIdSet) {
+    const iconPath = path.join(packageDir, `${id}.svg`);
 
-    const pixelMap = evaluateTsModule(source, 'lucidePixelMap');
-
-    if (!pixelMap || typeof pixelMap !== 'object') {
-      return new Map();
+    try {
+      const svg = await fs.readFile(iconPath, 'utf8');
+      map.set(id, extractCellsFromPixelSvg(svg));
+    } catch {
+      // Ignore missing or invalid files while building merge state.
     }
-
-    const map = new Map();
-
-    for (const [id, cells] of Object.entries(pixelMap)) {
-      if (!canonicalIdSet.has(id)) {
-        continue;
-      }
-
-      map.set(id, Array.isArray(cells) ? cells : []);
-    }
-
-    return map;
-  } catch {
-    return new Map();
   }
+
+  return map;
 }
 
 async function readExistingEntryMap(canonicalIds) {
   const canonicalSet = new Set(canonicalIds);
-  const [manifestMap, pixelMap] = await Promise.all([
+  const [manifestMap, svgCellMap] = await Promise.all([
     readExistingManifestMap(canonicalSet),
-    readExistingPixelMap(canonicalSet)
+    readExistingSvgCellMap(canonicalSet)
   ]);
 
   const entries = new Map();
 
   for (const id of canonicalIds) {
     const manifestEntry = manifestMap.get(id);
-    const pixelCells = pixelMap.get(id);
+    const pixelCells = svgCellMap.get(id);
 
     if (!manifestEntry || !pixelCells) {
       continue;
@@ -815,22 +775,6 @@ function serializeManifest(entries) {
   }
 
   lines.push('];', '');
-  return lines.join('\n');
-}
-
-function serializePixelMap(entries) {
-  const lines = [
-    'export type PixelCell = readonly [number, number];',
-    '',
-    'export const lucidePixelMap: Readonly<Record<string, readonly PixelCell[]>> = Object.freeze({'
-  ];
-
-  for (const entry of entries) {
-    const serializedCells = entry.pixelCells.map((cell) => `[${cell[0]}, ${cell[1]}]`).join(', ');
-    lines.push(`  '${entry.id}': [${serializedCells}],`);
-  }
-
-  lines.push('});', '');
   return lines.join('\n');
 }
 
@@ -914,7 +858,7 @@ function helpText() {
     'convert-lucide-to-pixel',
     '',
     'Options:',
-    '  --dry-run              Process without writing svg/manifest/pixel-map outputs',
+    '  --dry-run              Process without writing svg/manifest outputs',
     '  --report [path]        Write conversion report JSON (default: reports/conversion-report.json)',
     '  --batch-start <n>      Start index in canonical id list (default: 0)',
     '  --batch-size <n>       Number of ids to process (default: all canonical ids)',
@@ -997,9 +941,7 @@ export async function runConversion(rawOptions = {}) {
 
   if (!options.dryRun) {
     await ensureDirectory(manifestPath);
-    await ensureDirectory(pixelMapPath);
     await fs.writeFile(manifestPath, serializeManifest(manifestEntries), 'utf8');
-    await fs.writeFile(pixelMapPath, serializePixelMap(manifestEntries), 'utf8');
 
     const isFullCanonicalRun = idsToProcess.length === canonicalIds.length;
 

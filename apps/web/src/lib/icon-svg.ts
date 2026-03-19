@@ -1,4 +1,11 @@
-import { lucidePixelMap, type PixelIcon, type PixelShape } from '@pxicons/lucide';
+import {
+	buildRectRunsFromPixelCells,
+	extractPixelCellsFromSvg,
+	type PixelCell,
+	type PixelIcon,
+	type PixelRectRun,
+	type PixelShape
+} from '@pxicons/lucide';
 
 export interface MetaballOptions {
 	enabled: boolean;
@@ -22,12 +29,12 @@ const PIXEL_CANVAS_SIZE = 24;
 const DEFAULT_COLOR = 'currentColor';
 
 type RenderScope = 'grid' | 'detail';
-type PixelRectRun = readonly [number, number, number, number];
 
 const gridRawSvgCache = new Map<string, string>();
 const detailRawSvgCache = new Map<string, string>();
 const gridOptimizedSvgCache = new Map<string, string>();
 const detailOptimizedSvgCache = new Map<string, string>();
+const iconCellCache = new Map<string, readonly PixelCell[]>();
 const rectRunCache = new Map<string, readonly PixelRectRun[]>();
 const optimizedPathCache = new Map<string, string>();
 
@@ -155,9 +162,24 @@ function toFilterId(iconId: string, signature: string): string {
 	return `px-${fallbackId}-mb-${hashText(signature)}`;
 }
 
-function createUsesMarkup(symbolId: string, iconId: string): string {
-	const cells = lucidePixelMap[iconId] ?? [];
+function getIconGeometryKey(icon: PixelIcon): string {
+	return `${icon.id}|${hashText(icon.svg)}`;
+}
 
+function getIconCells(icon: PixelIcon): readonly PixelCell[] {
+	const geometryKey = getIconGeometryKey(icon);
+	const cached = iconCellCache.get(geometryKey);
+
+	if (cached) {
+		return cached;
+	}
+
+	const cells = extractPixelCellsFromSvg(icon.svg);
+	iconCellCache.set(geometryKey, cells);
+	return cells;
+}
+
+function createUsesMarkup(symbolId: string, cells: readonly PixelCell[]): string {
 	if (!cells.length) {
 		return '';
 	}
@@ -239,61 +261,21 @@ function createRoundedSubpath(x: number, y: number, size: number): string {
 	].join('');
 }
 
-function getRectRuns(iconId: string): readonly PixelRectRun[] {
-	const cached = rectRunCache.get(iconId);
+function getRectRuns(icon: PixelIcon): readonly PixelRectRun[] {
+	const geometryKey = getIconGeometryKey(icon);
+	const cached = rectRunCache.get(geometryKey);
 
 	if (cached) {
 		return cached;
 	}
 
-	const cells = lucidePixelMap[iconId] ?? [];
-	const rows = new Map<number, number[]>();
-
-	for (const [x, y] of cells) {
-		const row = rows.get(y);
-
-		if (row) {
-			row.push(x);
-		} else {
-			rows.set(y, [x]);
-		}
-	}
-
-	const runs: PixelRectRun[] = [];
-	const ys = [...rows.keys()].sort((a, b) => a - b);
-
-	for (const y of ys) {
-		const xs = [...new Set(rows.get(y) ?? [])].sort((a, b) => a - b);
-
-		if (xs.length === 0) {
-			continue;
-		}
-
-		let startX = xs[0];
-		let previousX = xs[0];
-
-		for (let index = 1; index < xs.length; index += 1) {
-			const currentX = xs[index];
-
-			if (currentX === previousX + 1) {
-				previousX = currentX;
-				continue;
-			}
-
-			runs.push([startX, y, previousX - startX + 1, 1]);
-			startX = currentX;
-			previousX = currentX;
-		}
-
-		runs.push([startX, y, previousX - startX + 1, 1]);
-	}
-
-	rectRunCache.set(iconId, runs);
+	const runs = buildRectRunsFromPixelCells(getIconCells(icon));
+	rectRunCache.set(geometryKey, runs);
 	return runs;
 }
 
 function createOptimizedPathData(
-	iconId: string,
+	icon: PixelIcon,
 	shape: PixelShape,
 	pixelSize: number,
 	pixelInset: number
@@ -302,13 +284,13 @@ function createOptimizedPathData(
 		return null;
 	}
 
-	const cells = lucidePixelMap[iconId] ?? [];
+	const cells = getIconCells(icon);
 
 	if (!cells.length) {
 		return '';
 	}
 
-	const key = `${iconId}|${shape}|${formatNumber(pixelSize)}|${formatNumber(pixelInset)}`;
+	const key = `${getIconGeometryKey(icon)}|${shape}|${formatNumber(pixelSize)}|${formatNumber(pixelInset)}`;
 	const cached = optimizedPathCache.get(key);
 
 	if (cached !== undefined) {
@@ -318,7 +300,7 @@ function createOptimizedPathData(
 	let pathData = '';
 
 	if (shape === 'square' && pixelSize >= 1) {
-		const rectRuns = getRectRuns(iconId);
+		const rectRuns = getRectRuns(icon);
 		pathData = rectRuns
 			.map(([x, y, width, height]) => {
 				const runX = x + pixelInset;
@@ -377,7 +359,7 @@ function normalizeSvgBuildContext(
 	const shape = normalizeShape(options.shape);
 	const scope = normalizeScope(options.scope);
 	const metaball = normalizeMetaball(options.metaball);
-	const cacheKey = `${mode}|${icon.id}|${shape}|${color}|${size}|${padding}|${backgroundColor}|pg:${pixelGap}|mb:${metaball.enabled ? 1 : 0}:${metaball.strength}`;
+	const cacheKey = `${mode}|${getIconGeometryKey(icon)}|${shape}|${color}|${size}|${padding}|${backgroundColor}|pg:${pixelGap}|mb:${metaball.enabled ? 1 : 0}:${metaball.strength}`;
 	const cache =
 		scope === 'grid'
 			? mode === 'optimized'
@@ -420,7 +402,7 @@ function buildRawCustomizedSvg(icon: PixelIcon, options: SvgCustomizationOptions
 		primitiveGeometry.pixelSize,
 		primitiveGeometry.pixelInset
 	);
-	const usesMarkup = createUsesMarkup(symbolId, icon.id);
+	const usesMarkup = createUsesMarkup(symbolId, getIconCells(icon));
 	const metaballFilter = context.metaball.enabled
 		? `${createMetaballFilterMarkup(filterId, context.metaball.strength)}\n`
 		: '';
@@ -458,7 +440,7 @@ export function buildOptimizedSvg(icon: PixelIcon, options: SvgCustomizationOpti
 	const filterId = toFilterId(icon.id, context.cacheKey);
 	const primitiveGeometry = resolvePrimitiveGeometry(context.pixelGap);
 	const pathData = createOptimizedPathData(
-		icon.id,
+		icon,
 		context.shape,
 		primitiveGeometry.pixelSize,
 		primitiveGeometry.pixelInset

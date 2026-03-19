@@ -5,6 +5,12 @@ import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit(), devtoolsJson()],
+	server: {
+		watch: {
+			// Edit tab writes icon SVG source files directly; avoid full-page reload on save.
+			ignored: ['**/packages/icons/lucide/*.svg']
+		}
+	},
 	test: {
 		expect: { requireAssertions: true },
 		environment: 'node',
