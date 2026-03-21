@@ -6,7 +6,6 @@ const DEFAULT_PROPS: PlaygroundSnippetProps = {
 	color: 'currentColor',
 	strokeWidth: 2,
 	absoluteStrokeWidth: false,
-	pixelGap: 0,
 	shape: 'square',
 	renderMode: 'auto',
 	title: ''
@@ -32,7 +31,6 @@ describe('buildPlaygroundSnippet', () => {
 			'color="currentColor"',
 			'strokeWidth={2}',
 			'absoluteStrokeWidth={false}',
-			'pixelGap={0}',
 			'shape="square"',
 			'renderMode="auto"',
 			'title="Playground title"'

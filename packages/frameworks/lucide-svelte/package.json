@@ -1,10 +1,31 @@
 {
   "name": "@pxicons/lucide-svelte",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Lucide pixel-art icon components for Svelte.",
   "license": "MIT",
   "type": "module",
+  "types": "./dist/lucide/index.d.ts",
+  "svelte": "./dist/lucide/index.js",
   "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Royserg/pxicons.git",
+    "directory": "packages/frameworks/lucide-svelte"
+  },
+  "homepage": "https://github.com/Royserg/pxicons/tree/dev/packages/frameworks/lucide-svelte#readme",
+  "bugs": {
+    "url": "https://github.com/Royserg/pxicons/issues"
+  },
+  "keywords": [
+    "icons",
+    "lucide",
+    "pixel-art",
+    "svelte",
+    "svelte-icons"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist"
   ],
@@ -28,10 +49,17 @@
   },
   "scripts": {
     "generate": "node ./scripts/generate-lucide.mjs",
+    "sync:jsr": "node ./scripts/sync-jsr-config.mjs",
     "build": "vp run generate && svelte-package --input ./src --output ./dist",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test:consistency": "vp test -- --run tests/lucide-consistency.test.ts",
     "test": "vp test",
+    "release:verify": "vp run build && vp run test && vp run sync:jsr",
+    "release:npm:dry-run": "$HOME/.vite-plus/bin/vp pm publish -- --dry-run --no-git-checks",
+    "release:jsr:dry-run": "$HOME/.vite-plus/bin/vp dlx -- jsr publish --dry-run",
+    "release:check": "vp run release:verify && vp run release:npm:dry-run && vp run release:jsr:dry-run",
+    "release:npm": "vp run release:check && $HOME/.vite-plus/bin/vp pm publish",
+    "release:jsr": "vp run release:verify && vp run release:jsr:dry-run && $HOME/.vite-plus/bin/vp dlx -- jsr publish",
     "prepublishOnly": "vp run build"
   },
   "peerDependencies": {

@@ -12,7 +12,6 @@
     size = 24,
     strokeWidth = 2,
     absoluteStrokeWidth = false,
-    pixelGap = 0,
     shape = 'square',
     renderMode = 'auto',
     iconPixels = [],
@@ -22,7 +21,7 @@
     ...props
   }: IconProps = $props();
 
-  const pixelGeometry = $derived(resolvePixelGeometry({ size, strokeWidth, absoluteStrokeWidth, pixelGap }));
+  const pixelGeometry = $derived(resolvePixelGeometry({ size, strokeWidth, absoluteStrokeWidth }));
   const pixelSize = $derived(pixelGeometry.pixelSize);
   const pixelInset = $derived(pixelGeometry.pixelInset);
   const normalizedShape = $derived(normalizeShape(shape));

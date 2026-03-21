@@ -4,7 +4,6 @@ export interface PixelGeometryOptions {
   size?: number | string;
   strokeWidth?: number | string;
   absoluteStrokeWidth?: boolean;
-  pixelGap?: number | string;
 }
 
 export interface PixelGeometry {
@@ -16,7 +15,6 @@ export function resolvePixelGeometry(options: PixelGeometryOptions): PixelGeomet
   const strokeWidth = options.strokeWidth ?? 2;
   const size = options.size ?? 24;
   const absoluteStrokeWidth = options.absoluteStrokeWidth ?? false;
-  const pixelGap = options.pixelGap ?? 0;
 
   const parsedStrokeWidth = Number(strokeWidth);
   const safeStrokeWidth = Number.isFinite(parsedStrokeWidth) ? parsedStrokeWidth : 2;
@@ -28,13 +26,7 @@ export function resolvePixelGeometry(options: PixelGeometryOptions): PixelGeomet
     absoluteStrokeWidth && hasNumericSize
       ? (safeStrokeWidth * 24) / parsedSize
       : safeStrokeWidth;
-
-  const parsedPixelGap = Number(pixelGap);
-  const safePixelGap = Number.isFinite(parsedPixelGap)
-    ? Math.min(0.95, Math.max(0, parsedPixelGap))
-    : 0;
-  const basePixelSize = Math.max(0.05, effectiveStrokeWidth / 2);
-  const pixelSize = Number(Math.min(2, Math.max(0.05, basePixelSize - safePixelGap)).toFixed(3));
+  const pixelSize = Number(Math.min(2, Math.max(0.05, effectiveStrokeWidth / 2)).toFixed(3));
   const pixelInset = Number(((1 - pixelSize) / 2).toFixed(3));
 
   return { pixelSize, pixelInset };

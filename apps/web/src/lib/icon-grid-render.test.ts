@@ -7,7 +7,6 @@ describe('buildGridSvgOptions', () => {
 			color: '#d6d6d9',
 			size: 24,
 			padding: 0,
-			pixelGap: 0,
 			backgroundColor: '',
 			shape: 'square',
 			scope: 'grid'

@@ -15,6 +15,7 @@
 		normalizeSvgMarkup,
 		type SvgInspectionModel
 	} from '$lib/svg-inspector';
+	import { prepareSvgOverlayMarkup } from '$lib/svg-overlay';
 	import { buildSvgVisualDiff, type SvgVisualDiffResult } from '$lib/svg-visual-diff';
 	import * as Drawer from '$lib/components/ui/drawer';
 
@@ -23,6 +24,9 @@
 	const SEARCH_DEBOUNCE_MS = 180;
 	const SEARCH_LOADING_DELAY_MS = 120;
 	const DETAIL_PREVIEW_COLOR = '#f3f5f8';
+	const EDIT_OVERLAY_OPACITY_MIN = 0;
+	const EDIT_OVERLAY_OPACITY_MAX = 90;
+	const DEFAULT_EDIT_OVERLAY_OPACITY = 35;
 	const GRID_ICON_OPTIONS = buildGridSvgOptions();
 	const SVG_OPEN_TAG_PATTERN = /<svg\b[^>]*>/i;
 	const SVG_FILL_ATTR_PATTERN = /\sfill=(['"]).*?\1/i;
@@ -94,6 +98,11 @@
 	let editPendingScrollToActiveMap = $state(false);
 	let isSavingEditSvg = $state(false);
 	let editSaveStatus = $state('');
+	let editOverlaySvg = $state('');
+	let editOverlayError = $state('');
+	let editOverlayPasteValue = $state('');
+	let editOverlayPopoverOpen = $state(false);
+	let editOverlayOpacityPercent = $state(DEFAULT_EDIT_OVERLAY_OPACITY);
 	let copyStatus = $state('');
 	let pendingClearSelection = $state(false);
 	let gridWidth = $state(0);
@@ -108,6 +117,8 @@
 	let gridViewportElement = $state<HTMLElement | null>(null);
 	let customizePreviewElement = $state<HTMLDivElement | null>(null);
 	let editPreviewElement = $state<HTMLDivElement | null>(null);
+	let editOverlayFileInput = $state<HTMLInputElement | null>(null);
+	let editOverlayMenuElement = $state<HTMLDivElement | null>(null);
 	let customizeCodeEditor = $state<SvgCodeEditorHandle | null>(null);
 	let editCodeEditor = $state<SvgCodeEditorHandle | null>(null);
 	let runtimeSvgOverrides = $state<Record<string, string>>({});
@@ -252,7 +263,6 @@
 			color: DETAIL_PREVIEW_COLOR,
 			size: 24,
 			padding: 0,
-			pixelGap: 0,
 			backgroundColor: '',
 			shape: 'square',
 			scope: 'detail'
@@ -340,6 +350,14 @@
 		return editSourceSvg !== editBaselineSvg;
 	});
 
+	const editOverlayOpacity = $derived.by(() => {
+		const bounded = Math.max(
+			EDIT_OVERLAY_OPACITY_MIN,
+			Math.min(EDIT_OVERLAY_OPACITY_MAX, editOverlayOpacityPercent)
+		);
+		return bounded / 100;
+	});
+
 	$effect(() => {
 		const value = queryInput;
 		const debounceTimer = window.setTimeout(() => {
@@ -398,6 +416,11 @@
 			editPendingScrollToActiveMap = false;
 			isSavingEditSvg = false;
 			editSaveStatus = '';
+			editOverlaySvg = '';
+			editOverlayError = '';
+			editOverlayPasteValue = '';
+			editOverlayPopoverOpen = false;
+			editOverlayOpacityPercent = DEFAULT_EDIT_OVERLAY_OPACITY;
 			activeEditOutputTab = 'preview';
 			return;
 		}
@@ -426,6 +449,11 @@
 			editPendingScrollToActiveMap = false;
 			isSavingEditSvg = false;
 			editSaveStatus = '';
+			editOverlaySvg = '';
+			editOverlayError = '';
+			editOverlayPasteValue = '';
+			editOverlayPopoverOpen = false;
+			editOverlayOpacityPercent = DEFAULT_EDIT_OVERLAY_OPACITY;
 			activeEditOutputTab = 'preview';
 		}
 	});
@@ -450,6 +478,7 @@
 		editActiveMapId = null;
 		editLastScrolledMapId = null;
 		editPendingScrollToActiveMap = false;
+		editOverlayPopoverOpen = false;
 	});
 
 	$effect(() => {
@@ -461,6 +490,36 @@
 		editActiveMapId = null;
 		editPendingScrollToActiveMap = false;
 		editLastScrolledMapId = null;
+	});
+
+	$effect(() => {
+		if (!editOverlayPopoverOpen || !editOverlayMenuElement) {
+			return;
+		}
+
+		const menuElement = editOverlayMenuElement;
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target;
+
+			if (target instanceof Node && menuElement.contains(target)) {
+				return;
+			}
+
+			editOverlayPopoverOpen = false;
+		};
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				editOverlayPopoverOpen = false;
+			}
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown);
+		window.addEventListener('keydown', handleKeyDown);
+
+		return () => {
+			document.removeEventListener('pointerdown', handlePointerDown);
+			window.removeEventListener('keydown', handleKeyDown);
+		};
 	});
 
 	$effect(() => {
@@ -779,6 +838,75 @@
 		editActiveMapId = mapId;
 		editInspectMode = false;
 		editPendingScrollToActiveMap = true;
+	}
+
+	function applyEditOverlay(source: string): boolean {
+		const result = prepareSvgOverlayMarkup(source);
+
+		if (!result.ok) {
+			editOverlayError = result.error;
+			return false;
+		}
+
+		editOverlaySvg = result.markup;
+		editOverlayError = '';
+		return true;
+	}
+
+	function openEditOverlayFilePicker(): void {
+		editOverlayFileInput?.click();
+	}
+
+	async function handleEditOverlayFileChange(event: Event): Promise<void> {
+		const input = event.currentTarget;
+
+		if (!(input instanceof HTMLInputElement)) {
+			return;
+		}
+
+		const file = input.files?.[0];
+
+		if (!file) {
+			return;
+		}
+
+		try {
+			const svgSource = await file.text();
+			applyEditOverlay(svgSource);
+		} catch {
+			editOverlayError = 'Failed to read overlay SVG file.';
+		} finally {
+			input.value = '';
+		}
+	}
+
+	function toggleEditOverlayPopover(): void {
+		editOverlayPopoverOpen = !editOverlayPopoverOpen;
+
+		if (editOverlayPopoverOpen) {
+			editOverlayError = '';
+		}
+	}
+
+	function applyEditOverlayPaste(): void {
+		const source = editOverlayPasteValue.trim();
+
+		if (!source) {
+			editOverlayError = 'Paste SVG markup before applying overlay.';
+			return;
+		}
+
+		applyEditOverlay(source);
+	}
+
+	function clearEditOverlayPaste(): void {
+		editOverlayPasteValue = '';
+		editOverlayError = '';
+	}
+
+	function removeEditOverlay(): void {
+		editOverlaySvg = '';
+		editOverlayError = '';
 	}
 
 	function selectIcon(icon: PixelIcon): void {
@@ -1301,39 +1429,9 @@
 							class="customize-editor-pane"
 						>
 							<div class="customize-toolbar">
-								<div
-									class="customize-status"
-									class:invalid={editMappingStatus === 'invalid'}
-									class:partial={editMappingStatus === 'partial'}
-								>
-									{#if editMappingStatus === 'ready'}
-										Inspect map ready
-									{:else if editMappingStatus === 'partial'}
-										Inspect map partial
-									{:else}
-										Inspect map invalid
-									{/if}
-								</div>
-
 								<div class="customize-toolbar-actions">
 									<button type="button" class="customize-tool-button" onclick={normalizeEditSvg}>
 										Normalize
-									</button>
-									<button
-										type="button"
-										class="customize-tool-button inspect-toggle"
-										class:active={editInspectMode}
-										onclick={toggleEditInspectMode}
-										aria-pressed={editInspectMode}
-										title="Toggle inspect mode"
-									>
-										<span class="inspect-icon" aria-hidden="true">
-											<svg viewBox="0 0 16 16" focusable="false">
-												<path d="M6 2h4v2h2v4h-2v2H6V8H4V4h2Z" />
-												<path d="M2 10h2v2h2v2h4v-2h2v-2h2v4H2Z" />
-											</svg>
-										</span>
-										Inspect
 									</button>
 									<button
 										type="button"
@@ -1345,11 +1443,6 @@
 									</button>
 								</div>
 							</div>
-							<p class="customize-hint framework-build-hint">
-								Edit saves sync framework source files only. Run
-								<code>vp run frameworks:build</code> to refresh package dist used by consumers and
-								Playground.
-							</p>
 
 							<SvgCodeEditor
 								class="customize-editor"
@@ -1362,29 +1455,139 @@
 						</div>
 
 						<section class="customize-output-pane edit-output-pane">
-							<div class="usage-tabs edit-output-tabs" role="tablist" aria-label="Edit output mode">
-								<button
-									type="button"
-									role="tab"
-									class:active={activeEditOutputTab === 'preview'}
-									aria-selected={activeEditOutputTab === 'preview'}
-									onclick={() => {
-										activeEditOutputTab = 'preview';
-									}}
+							<div class="edit-output-head">
+								<div
+									class="usage-tabs edit-output-tabs"
+									role="tablist"
+									aria-label="Edit output mode"
 								>
-									Preview
-								</button>
-								<button
-									type="button"
-									role="tab"
-									class:active={activeEditOutputTab === 'diff'}
-									aria-selected={activeEditOutputTab === 'diff'}
-									onclick={() => {
-										activeEditOutputTab = 'diff';
-									}}
-								>
-									Diff
-								</button>
+									<button
+										type="button"
+										role="tab"
+										class:active={activeEditOutputTab === 'preview'}
+										aria-selected={activeEditOutputTab === 'preview'}
+										onclick={() => {
+											activeEditOutputTab = 'preview';
+										}}
+									>
+										Preview
+									</button>
+									<button
+										type="button"
+										role="tab"
+										class:active={activeEditOutputTab === 'diff'}
+										aria-selected={activeEditOutputTab === 'diff'}
+										onclick={() => {
+											activeEditOutputTab = 'diff';
+										}}
+									>
+										Diff
+									</button>
+								</div>
+								<div class="edit-output-actions">
+									<button
+										type="button"
+										class="customize-tool-button inspect-toggle"
+										class:active={editInspectMode}
+										onclick={toggleEditInspectMode}
+										aria-pressed={editInspectMode}
+										title="Toggle inspect mode"
+										disabled={activeEditOutputTab !== 'preview'}
+									>
+										<span class="inspect-icon" aria-hidden="true">
+											<svg viewBox="0 0 16 16" focusable="false">
+												<path d="M6 2h4v2h2v4h-2v2H6V8H4V4h2Z" />
+												<path d="M2 10h2v2h2v2h4v-2h2v-2h2v4H2Z" />
+											</svg>
+										</span>
+										Inspect
+									</button>
+									<div class="edit-overlay-menu" bind:this={editOverlayMenuElement}>
+										<button
+											type="button"
+											class="customize-tool-button edit-overlay-trigger"
+											class:active={editOverlayPopoverOpen || Boolean(editOverlaySvg)}
+											onclick={toggleEditOverlayPopover}
+											aria-expanded={editOverlayPopoverOpen}
+											aria-controls="edit-overlay-popover"
+										>
+											Overlay
+										</button>
+										{#if editOverlayPopoverOpen}
+											<div
+												id="edit-overlay-popover"
+												class="edit-overlay-popover"
+												role="dialog"
+												aria-label="Overlay options"
+											>
+												<input
+													class="overlay-file-input"
+													type="file"
+													accept=".svg,image/svg+xml"
+													bind:this={editOverlayFileInput}
+													onchange={handleEditOverlayFileChange}
+												/>
+												<div class="edit-overlay-actions">
+													<button
+														type="button"
+														class="customize-tool-button"
+														onclick={openEditOverlayFilePicker}
+													>
+														Upload SVG
+													</button>
+													<button
+														type="button"
+														class="customize-tool-button"
+														onclick={removeEditOverlay}
+														disabled={!editOverlaySvg}
+													>
+														Delete overlay
+													</button>
+												</div>
+												<label class="edit-overlay-paste-label" for="edit-overlay-paste">
+													Paste SVG
+												</label>
+												<textarea
+													id="edit-overlay-paste"
+													bind:value={editOverlayPasteValue}
+													rows="5"
+													placeholder="<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot;>…</svg>"
+												></textarea>
+												<div class="edit-overlay-paste-actions">
+													<button
+														type="button"
+														class="customize-tool-button"
+														onclick={applyEditOverlayPaste}
+													>
+														Apply paste
+													</button>
+													<button
+														type="button"
+														class="customize-tool-button"
+														onclick={clearEditOverlayPaste}
+													>
+														Clear
+													</button>
+												</div>
+												{#if editOverlaySvg}
+													<label class="edit-overlay-opacity">
+														<span>Overlay opacity {editOverlayOpacityPercent}%</span>
+														<input
+															type="range"
+															min={EDIT_OVERLAY_OPACITY_MIN}
+															max={EDIT_OVERLAY_OPACITY_MAX}
+															step="5"
+															bind:value={editOverlayOpacityPercent}
+														/>
+													</label>
+												{/if}
+												{#if editOverlayError}
+													<p class="customize-error edit-overlay-error">{editOverlayError}</p>
+												{/if}
+											</div>
+										{/if}
+									</div>
+								</div>
 							</div>
 
 							<div class="customize-output">
@@ -1401,6 +1604,15 @@
 										onpointerdown={handleEditPreviewPointerDown}
 									>
 										{@html editRenderedSvg}
+										{#if editOverlaySvg}
+											<div
+												class="edit-overlay-layer"
+												aria-hidden="true"
+												style={`--overlay-opacity:${editOverlayOpacity};`}
+											>
+												{@html editOverlaySvg}
+											</div>
+										{/if}
 									</div>
 								{:else}
 									<div

@@ -16,7 +16,6 @@ export interface IconProps extends SVGAttributes<SVGSVGElement> {
   size?: number | string;
   strokeWidth?: number | string;
   absoluteStrokeWidth?: boolean;
-  pixelGap?: number | string;
   shape?: PixelShape;
   renderMode?: IconRenderMode;
   iconPixels?: IconPixels;

@@ -15,18 +15,6 @@
 		component: IconComponent;
 	}
 
-	interface PresetVariant {
-		id: string;
-		label: string;
-		size: number;
-		color: string;
-		strokeWidth: number;
-		absoluteStrokeWidth: boolean;
-		pixelGap: number;
-		shape: PlaygroundShape;
-		renderMode: PlaygroundRenderMode;
-	}
-
 	const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 	const iconOptions: readonly IconOption[] = [
 		{ name: 'Activity', component: Activity },
@@ -38,47 +26,11 @@
 	];
 	const shapeOptions: readonly PlaygroundShape[] = ['square', 'circle', 'rounded'];
 	const renderModeOptions: readonly PlaygroundRenderMode[] = ['auto', 'raw', 'optimized'];
-	const presetVariants: readonly PresetVariant[] = [
-		{
-			id: 'default',
-			label: 'Default',
-			size: 24,
-			color: 'currentColor',
-			strokeWidth: 2,
-			absoluteStrokeWidth: false,
-			pixelGap: 0,
-			shape: 'square',
-			renderMode: 'auto'
-		},
-		{
-			id: 'rounded-gap',
-			label: 'Rounded + Gap',
-			size: 34,
-			color: '#f7c85d',
-			strokeWidth: 2,
-			absoluteStrokeWidth: false,
-			pixelGap: 0.18,
-			shape: 'rounded',
-			renderMode: 'raw'
-		},
-		{
-			id: 'circle-optimized',
-			label: 'Circle Optimized',
-			size: 42,
-			color: '#7fd8ff',
-			strokeWidth: 3,
-			absoluteStrokeWidth: false,
-			pixelGap: 0.08,
-			shape: 'circle',
-			renderMode: 'optimized'
-		}
-	];
 
 	let selectedIconName = $state('Settings');
 	let size = $state(24);
 	let strokeWidth = $state(2);
 	let absoluteStrokeWidth = $state(false);
-	let pixelGap = $state(0);
 	let shape = $state<PlaygroundShape>('square');
 	let renderMode = $state<PlaygroundRenderMode>('auto');
 	let color = $state('currentColor');
@@ -102,18 +54,20 @@
 	});
 
 	const codeSnippet = $derived.by(() =>
-		buildPlaygroundSnippet(selectedIconOption.name, {
-			size,
-			color: resolvedColor,
-			strokeWidth,
-			absoluteStrokeWidth,
-			pixelGap,
-			shape,
-			renderMode,
-			title: resolvedTitle ?? ''
-		})
-	);
+			buildPlaygroundSnippet(selectedIconOption.name, {
+				size,
+				color: resolvedColor,
+				strokeWidth,
+				absoluteStrokeWidth,
+				shape,
+				renderMode,
+				title: resolvedTitle ?? ''
+			})
+		);
 	const SelectedIcon = $derived.by(() => selectedIconOption.component);
+	const previewGridStyle = $derived.by(
+		() => `--preview-size:${size}px;--preview-cell:${(size / 24).toFixed(4)}px;`
+	);
 
 	function normalizeHexColor(value: string): string {
 		if (value.length === 4) {
@@ -222,11 +176,6 @@
 			</label>
 
 			<label class="control">
-				<span>pixelGap <output>{pixelGap.toFixed(2)}</output></span>
-				<input type="range" min="0" max="0.95" step="0.01" bind:value={pixelGap} />
-			</label>
-
-			<label class="control">
 				<span>Shape</span>
 				<select bind:value={shape}>
 					{#each shapeOptions as option (option)}
@@ -263,53 +212,38 @@
 			</label>
 		</form>
 
-		<div class="output-panel">
-			<section class="preview-card" aria-label="Interactive preview">
-				<h2>Interactive Preview</h2>
-				<div class="preview-stage">
-					<SelectedIcon
-						size={size}
-						color={resolvedColor}
-						strokeWidth={strokeWidth}
-						absoluteStrokeWidth={absoluteStrokeWidth}
-						pixelGap={pixelGap}
-						shape={shape}
-						renderMode={renderMode}
-						title={resolvedTitle}
-					/>
-				</div>
-			</section>
-
-			<section class="preset-card-grid" aria-label="Preset variants">
-				{#each presetVariants as preset (preset.id)}
-					<article class="preset-card">
-						<p>{preset.label}</p>
-						<div class="preset-icon-wrap">
-							<SelectedIcon
-								size={preset.size}
-								color={preset.color}
-								strokeWidth={preset.strokeWidth}
-								absoluteStrokeWidth={preset.absoluteStrokeWidth}
-								pixelGap={preset.pixelGap}
-								shape={preset.shape}
-								renderMode={preset.renderMode}
-							/>
+			<div class="output-panel">
+				<section class="preview-card" aria-label="Interactive preview">
+					<h2>Interactive Preview</h2>
+					<div class="preview-stage">
+						<div class="preview-artboard" style={previewGridStyle}>
+							<div class="preview-grid" aria-hidden="true"></div>
+							<div class="preview-icon">
+								<SelectedIcon
+									size={size}
+									color={resolvedColor}
+									strokeWidth={strokeWidth}
+									absoluteStrokeWidth={absoluteStrokeWidth}
+									shape={shape}
+									renderMode={renderMode}
+									title={resolvedTitle}
+								/>
+							</div>
 						</div>
-					</article>
-				{/each}
-			</section>
+					</div>
+				</section>
 
-			<section class="snippet-card" aria-label="Generated Svelte code">
-				<div class="snippet-header">
-					<h2>Generated Code</h2>
-					<button type="button" onclick={copySnippet}>Copy code</button>
-				</div>
-				<pre><code>{codeSnippet}</code></pre>
-				{#if copyStatus}
-					<p class="copy-status">{copyStatus}</p>
-				{/if}
-			</section>
-		</div>
+				<section class="snippet-card" aria-label="Generated Svelte code">
+					<div class="snippet-header">
+						<h2>Generated Code</h2>
+						<button type="button" onclick={copySnippet}>Copy code</button>
+					</div>
+					<pre><code>{codeSnippet}</code></pre>
+					{#if copyStatus}
+						<p class="copy-status">{copyStatus}</p>
+					{/if}
+				</section>
+			</div>
 	</section>
 </section>
 
@@ -476,10 +410,10 @@
 		display: grid;
 		gap: 0.7rem;
 		min-height: 0;
+		grid-template-rows: auto minmax(0, 1fr);
 	}
 
 	.preview-card,
-	.preset-card-grid,
 	.snippet-card {
 		display: grid;
 		gap: 0.6rem;
@@ -500,54 +434,43 @@
 		aspect-ratio: 1 / 1;
 		display: grid;
 		place-items: center;
+		overflow: hidden;
 		border-radius: 9px;
 		border: 1px solid #25262d;
+		background: #0b0b11;
+	}
+
+	.preview-artboard {
+		position: relative;
+		width: var(--preview-size);
+		height: var(--preview-size);
+	}
+
+	.preview-grid,
+	.preview-icon {
+		position: absolute;
+		inset: 0;
+	}
+
+	.preview-grid {
+		border: 1px solid #2a2e39;
 		background:
 			linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
 			linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
 			#0b0b11;
-		background-size:
-			calc(100% / 24) calc(100% / 24),
-			calc(100% / 24) calc(100% / 24);
+		background-size: var(--preview-cell) var(--preview-cell);
+	}
+
+	.preview-icon {
+		display: grid;
+		place-items: center;
 	}
 
 	.preview-stage :global(svg),
-	.preset-icon-wrap :global(svg),
+	.preview-icon :global(svg),
 	.sample-icon :global(svg) {
 		image-rendering: pixelated;
 		image-rendering: crisp-edges;
-	}
-
-	.preset-card-grid {
-		grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-	}
-
-	.preset-card {
-		display: grid;
-		gap: 0.45rem;
-		padding: 0.6rem;
-		border-radius: 9px;
-		border: 1px solid #2a2b31;
-		background: #101118;
-	}
-
-	.preset-card p {
-		margin: 0;
-		font-size: 0.66rem;
-		color: #9eabc4;
-	}
-
-	.preset-icon-wrap {
-		aspect-ratio: 1 / 1;
-		display: grid;
-		place-items: center;
-		border-radius: 8px;
-		border: 1px solid #2d3038;
-		background:
-			linear-gradient(to right, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
-			linear-gradient(to bottom, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
-			#0b0c12;
-		background-size: 10px 10px;
 	}
 
 	.snippet-card {
@@ -582,6 +505,7 @@
 		border: 1px solid #2a2e36;
 		background: #0b0d14;
 		overflow: auto;
+		min-height: 280px;
 		font-family: var(--font-geist-mono), monospace;
 		font-size: 0.72rem;
 		line-height: 1.5;

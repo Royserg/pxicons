@@ -6,7 +6,6 @@ export interface PlaygroundSnippetProps {
 	color: string;
 	strokeWidth: number;
 	absoluteStrokeWidth: boolean;
-	pixelGap: number;
 	shape: PlaygroundShape;
 	renderMode: PlaygroundRenderMode;
 	title: string;
@@ -17,7 +16,6 @@ const PROP_ORDER = [
 	'color',
 	'strokeWidth',
 	'absoluteStrokeWidth',
-	'pixelGap',
 	'shape',
 	'renderMode',
 	'title'
@@ -40,7 +38,7 @@ function serializeProp(
 	key: keyof PlaygroundSnippetProps,
 	value: PlaygroundSnippetProps[keyof PlaygroundSnippetProps]
 ): string {
-	if (key === 'size' || key === 'strokeWidth' || key === 'pixelGap') {
+	if (key === 'size' || key === 'strokeWidth') {
 		return `{${formatNumber(Number(value))}}`;
 	}
 

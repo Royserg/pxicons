@@ -728,9 +728,107 @@ a {
 	color: #b8c8ea;
 }
 
+.overlay-file-input {
+  display: none;
+}
+
+.edit-output-head {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
 .edit-output-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.edit-output-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.edit-overlay-menu {
+  position: relative;
+}
+
+.edit-overlay-trigger {
+  min-width: 84px;
+  justify-content: center;
+}
+
+.edit-overlay-popover {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 24;
+  width: min(320px, calc(100vw - 3rem));
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.58rem;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #0b0c10;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+.edit-overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.edit-overlay-paste-label {
+  color: #8f9ab2;
+  font-size: 0.68rem;
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.edit-overlay-popover textarea {
+  width: 100%;
+  min-height: 6.1rem;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #09090c;
+  color: #dce3f1;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  font-family: var(--font-geist-mono), monospace;
+  padding: 0.5rem 0.6rem;
+}
+
+.edit-overlay-popover textarea:focus {
+  outline: 1px solid #5f6678;
+  outline-offset: 0;
+}
+
+.edit-overlay-paste-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.edit-overlay-opacity {
+  display: grid;
+  gap: 0.28rem;
+  color: #8f9ab2;
+  font-size: 0.68rem;
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.edit-overlay-opacity input[type='range'] {
+  width: 100%;
+  accent-color: #9ab0d9;
+}
+
+.edit-overlay-error {
+  padding: 0 0.1rem;
 }
 
 .customize-editor {
@@ -781,6 +879,23 @@ a {
 }
 
 .customize-output-canvas svg {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.edit-overlay-layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: var(--overlay-opacity, 0.35);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.edit-overlay-layer svg {
   width: 100%;
   height: 100%;
   image-rendering: pixelated;
@@ -947,5 +1062,19 @@ a {
 
   .usage-tabs button {
     flex: 0 0 auto;
+  }
+
+  .edit-output-head {
+    flex-wrap: wrap;
+  }
+
+  .edit-output-actions {
+    margin-left: 0;
+  }
+
+  .edit-overlay-popover {
+    left: 0;
+    right: auto;
+    width: min(320px, calc(100vw - 2.4rem));
   }
 }

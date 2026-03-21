@@ -16,7 +16,6 @@ export interface SvgCustomizationOptions {
 	color: string;
 	size: number;
 	padding: number;
-	pixelGap?: number;
 	backgroundColor?: string;
 	shape?: PixelShape;
 	scope?: RenderScope;
@@ -49,14 +48,6 @@ function clampInteger(value: number, minimum: number): number {
 function clampPadding(value: number): number {
 	const maxPadding = Math.floor(PIXEL_CANVAS_SIZE / 2) - 1;
 	return Math.min(clampInteger(value, 0), maxPadding);
-}
-
-function clampPixelGap(value: number | undefined): number {
-	if (value === undefined || !Number.isFinite(value)) {
-		return 0;
-	}
-
-	return Number(Math.min(0.95, Math.max(0, value)).toFixed(3));
 }
 
 function formatNumber(value: number): string {
@@ -111,11 +102,8 @@ function toSymbolId(): string {
 	return 'px';
 }
 
-function resolvePrimitiveGeometry(pixelGap: number): { pixelSize: number; pixelInset: number } {
-	const pixelSize = Number(Math.min(2, Math.max(0.05, 1 - pixelGap)).toFixed(3));
-	const pixelInset = Number(((1 - pixelSize) / 2).toFixed(3));
-
-	return { pixelSize, pixelInset };
+function resolvePrimitiveGeometry(): { pixelSize: number; pixelInset: number } {
+	return { pixelSize: 1, pixelInset: 0 };
 }
 
 function getPrimitiveMarkup(shape: PixelShape, pixelSize: number, pixelInset: number): string {
@@ -337,7 +325,6 @@ interface NormalizedSvgBuildContext {
 	color: string;
 	size: number;
 	padding: number;
-	pixelGap: number;
 	backgroundColor: string;
 	shape: PixelShape;
 	scope: RenderScope;
@@ -354,12 +341,11 @@ function normalizeSvgBuildContext(
 	const color = normalizeColor(options.color, DEFAULT_COLOR);
 	const size = clampInteger(options.size, PIXEL_CANVAS_SIZE);
 	const padding = clampPadding(options.padding);
-	const pixelGap = clampPixelGap(options.pixelGap);
 	const backgroundColor = normalizeColor(options.backgroundColor, '');
 	const shape = normalizeShape(options.shape);
 	const scope = normalizeScope(options.scope);
 	const metaball = normalizeMetaball(options.metaball);
-	const cacheKey = `${mode}|${getIconGeometryKey(icon)}|${shape}|${color}|${size}|${padding}|${backgroundColor}|pg:${pixelGap}|mb:${metaball.enabled ? 1 : 0}:${metaball.strength}`;
+	const cacheKey = `${mode}|${getIconGeometryKey(icon)}|${shape}|${color}|${size}|${padding}|${backgroundColor}|mb:${metaball.enabled ? 1 : 0}:${metaball.strength}`;
 	const cache =
 		scope === 'grid'
 			? mode === 'optimized'
@@ -373,7 +359,6 @@ function normalizeSvgBuildContext(
 		color,
 		size,
 		padding,
-		pixelGap,
 		backgroundColor,
 		shape,
 		scope,
@@ -396,7 +381,7 @@ function buildRawCustomizedSvg(icon: PixelIcon, options: SvgCustomizationOptions
 	const translate = context.padding;
 	const symbolId = toSymbolId();
 	const filterId = toFilterId(icon.id, context.cacheKey);
-	const primitiveGeometry = resolvePrimitiveGeometry(context.pixelGap);
+	const primitiveGeometry = resolvePrimitiveGeometry();
 	const primitive = getPrimitiveMarkup(
 		context.shape,
 		primitiveGeometry.pixelSize,
@@ -438,7 +423,7 @@ export function buildOptimizedSvg(icon: PixelIcon, options: SvgCustomizationOpti
 	const scale = drawableSize / PIXEL_CANVAS_SIZE;
 	const translate = context.padding;
 	const filterId = toFilterId(icon.id, context.cacheKey);
-	const primitiveGeometry = resolvePrimitiveGeometry(context.pixelGap);
+	const primitiveGeometry = resolvePrimitiveGeometry();
 	const pathData = createOptimizedPathData(
 		icon,
 		context.shape,

@@ -86,18 +86,6 @@ describe('buildCustomizedSvg', () => {
 		expect(roundedSvg).toContain('<rect width="1" height="1" rx="0.24" ry="0.24" />');
 	});
 
-	it('renders inset primitive geometry when pixelGap is enabled', () => {
-		const gappedSquare = buildCustomizedSvg(settingsIcon, {
-			color: '#ffffff',
-			size: 96,
-			padding: 0,
-			shape: 'square',
-			pixelGap: 0.2
-		});
-
-		expect(gappedSquare).toContain('<rect x="0.1" y="0.1" width="0.8" height="0.8" />');
-	});
-
 	it('injects metaball filter only when enabled', () => {
 		const metaballOn = buildCustomizedSvg(settingsIcon, {
 			color: '#ffffff',
@@ -159,19 +147,11 @@ describe('buildCustomizedSvg', () => {
 			padding: 1,
 			shape: 'square'
 		});
-		const gapped = buildCustomizedSvg(settingsIcon, {
-			color: '#ffffff',
-			size: 96,
-			padding: 1,
-			shape: 'square',
-			pixelGap: 0.2
-		});
 
 		expect(extractSymbolId(settingsSquare)).toBe('px');
 		expect(extractSymbolId(settingsSquareAgain)).toBe('px');
 		expect(extractSymbolId(settingsCircle)).toBe('px');
 		expect(extractSymbolId(searchSquare)).toBe('px');
-		expect(extractSymbolId(gapped)).toBe('px');
 	});
 
 	it('emits symbol with preserveAspectRatio none for per-use scaling edits', () => {
@@ -185,24 +165,6 @@ describe('buildCustomizedSvg', () => {
 		expect(customized).toContain(
 			'<symbol id="px" viewBox="0 0 1 1" overflow="visible" preserveAspectRatio="none">'
 		);
-	});
-
-	it('keeps output unchanged when pixelGap is explicitly zero', () => {
-		const implicitGap = buildCustomizedSvg(settingsIcon, {
-			color: '#ffffff',
-			size: 96,
-			padding: 0,
-			shape: 'rounded'
-		});
-		const explicitZeroGap = buildCustomizedSvg(settingsIcon, {
-			color: '#ffffff',
-			size: 96,
-			padding: 0,
-			shape: 'rounded',
-			pixelGap: 0
-		});
-
-		expect(explicitZeroGap).toBe(implicitGap);
 	});
 
 	it('creates deterministic filter ids and varies by metaball strength', () => {
@@ -283,7 +245,7 @@ describe('buildOptimizedSvg', () => {
 		expect(optimized).not.toMatch(/<g[^>]* transform="/);
 	});
 
-	it('varies optimized output by shape and pixelGap', () => {
+	it('varies optimized output by shape and layout transform', () => {
 		const square = buildOptimizedSvg(settingsIcon, {
 			color: '#ffffff',
 			size: 96,
@@ -296,16 +258,15 @@ describe('buildOptimizedSvg', () => {
 			padding: 0,
 			shape: 'circle'
 		});
-		const gapped = buildOptimizedSvg(settingsIcon, {
+		const padded = buildOptimizedSvg(settingsIcon, {
 			color: '#ffffff',
 			size: 96,
-			padding: 0,
-			shape: 'square',
-			pixelGap: 0.2
+			padding: 1,
+			shape: 'square'
 		});
 
 		expect(square).not.toBe(circle);
-		expect(square).not.toBe(gapped);
+		expect(square).not.toBe(padded);
 	});
 
 	it('includes metaball filter markup when enabled', () => {
