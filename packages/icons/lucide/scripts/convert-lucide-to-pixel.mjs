@@ -16,6 +16,8 @@ const defaultReportPath = path.join(packageDir, 'reports/conversion-report.json'
 
 const NO_OVERWRITE = new Set(['settings']);
 const SHAPE_TAGS = new Set(['path', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'rect']);
+const PATH_COMMAND_PATTERN = /^[AaCcHhLlMmQqSsTtVvZz]$/;
+const PATH_TOKEN_PATTERN = /[AaCcHhLlMmQqSsTtVvZz]|[-+]?(?:\d*\.\d+|\d+)(?:e[-+]?\d+)?/g;
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '',
@@ -130,6 +132,285 @@ function parsePointPairs(pointsText) {
   }
 
   return points;
+}
+
+export function normalizePathDataForSampling(pathData) {
+  return String(pathData || '')
+    .replace(/,/g, ' ')
+    .replace(/([AaCcHhLlMmQqSsTtVvZz])/g, ' $1 ')
+    .replace(/([0-9.])([+-])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function createPathSampler(pathData) {
+  const rawPathData = String(pathData || '').trim();
+
+  if (!rawPathData) {
+    return null;
+  }
+
+  const normalizedPathData = normalizePathDataForSampling(rawPathData);
+  const candidates = normalizedPathData && normalizedPathData !== rawPathData
+    ? [rawPathData, normalizedPathData]
+    : [rawPathData];
+
+  for (const candidate of candidates) {
+    try {
+      const pathProperties = new svgPathProperties(candidate);
+      const length = pathProperties.getTotalLength();
+
+      if (!Number.isFinite(length) || length < 0) {
+        continue;
+      }
+
+      return {
+        pathProperties,
+        length
+      };
+    } catch {
+      // Ignore invalid path serialization attempts and continue fallback candidates.
+    }
+  }
+
+  return null;
+}
+
+function drawPathFallbackSegments(grid, pathData, toGridX, toGridY, radius) {
+  const normalizedPathData = normalizePathDataForSampling(pathData);
+  const tokens = normalizedPathData.match(PATH_TOKEN_PATTERN) ?? [];
+
+  if (tokens.length === 0) {
+    return false;
+  }
+
+  let cursor = 0;
+  let command = '';
+  let currentX = 0;
+  let currentY = 0;
+  let subpathStartX = 0;
+  let subpathStartY = 0;
+  let hasCurrentPoint = false;
+  let drewSegment = false;
+
+  const isCommandToken = (token) => PATH_COMMAND_PATTERN.test(token);
+  const readNumbers = (count) => {
+    if (cursor + count > tokens.length) {
+      return null;
+    }
+
+    const values = [];
+
+    for (let offset = 0; offset < count; offset += 1) {
+      const token = tokens[cursor + offset];
+
+      if (isCommandToken(token)) {
+        return null;
+      }
+
+      const value = Number.parseFloat(token);
+
+      if (!Number.isFinite(value)) {
+        return null;
+      }
+
+      values.push(value);
+    }
+
+    cursor += count;
+    return values;
+  };
+
+  const drawTo = (nextX, nextY) => {
+    if (!hasCurrentPoint) {
+      currentX = nextX;
+      currentY = nextY;
+      subpathStartX = nextX;
+      subpathStartY = nextY;
+      hasCurrentPoint = true;
+      return;
+    }
+
+    drawSegment(grid, toGridX(currentX), toGridY(currentY), toGridX(nextX), toGridY(nextY), radius);
+    currentX = nextX;
+    currentY = nextY;
+    drewSegment = true;
+  };
+
+  while (cursor < tokens.length) {
+    const token = tokens[cursor];
+
+    if (isCommandToken(token)) {
+      command = token;
+      cursor += 1;
+    } else if (!command) {
+      break;
+    }
+
+    const lowerCommand = command.toLowerCase();
+    const isRelative = command === lowerCommand;
+
+    if (lowerCommand === 'z') {
+      if (hasCurrentPoint) {
+        drawSegment(
+          grid,
+          toGridX(currentX),
+          toGridY(currentY),
+          toGridX(subpathStartX),
+          toGridY(subpathStartY),
+          radius
+        );
+        currentX = subpathStartX;
+        currentY = subpathStartY;
+        drewSegment = true;
+      }
+
+      continue;
+    }
+
+    if (lowerCommand === 'm') {
+      const move = readNumbers(2);
+
+      if (!move) {
+        break;
+      }
+
+      const [x, y] = move;
+      currentX = isRelative ? currentX + x : x;
+      currentY = isRelative ? currentY + y : y;
+      subpathStartX = currentX;
+      subpathStartY = currentY;
+      hasCurrentPoint = true;
+
+      while (true) {
+        const line = readNumbers(2);
+
+        if (!line) {
+          break;
+        }
+
+        const [lineX, lineY] = line;
+        const nextX = isRelative ? currentX + lineX : lineX;
+        const nextY = isRelative ? currentY + lineY : lineY;
+        drawTo(nextX, nextY);
+      }
+
+      continue;
+    }
+
+    if (lowerCommand === 'l') {
+      while (true) {
+        const line = readNumbers(2);
+
+        if (!line) {
+          break;
+        }
+
+        const [lineX, lineY] = line;
+        const nextX = isRelative ? currentX + lineX : lineX;
+        const nextY = isRelative ? currentY + lineY : lineY;
+        drawTo(nextX, nextY);
+      }
+
+      continue;
+    }
+
+    if (lowerCommand === 'h') {
+      while (true) {
+        const values = readNumbers(1);
+
+        if (!values) {
+          break;
+        }
+
+        const [lineX] = values;
+        const nextX = isRelative ? currentX + lineX : lineX;
+        drawTo(nextX, currentY);
+      }
+
+      continue;
+    }
+
+    if (lowerCommand === 'v') {
+      while (true) {
+        const values = readNumbers(1);
+
+        if (!values) {
+          break;
+        }
+
+        const [lineY] = values;
+        const nextY = isRelative ? currentY + lineY : lineY;
+        drawTo(currentX, nextY);
+      }
+
+      continue;
+    }
+
+    if (lowerCommand === 'c') {
+      while (true) {
+        const curve = readNumbers(6);
+
+        if (!curve) {
+          break;
+        }
+
+        const nextX = isRelative ? currentX + curve[4] : curve[4];
+        const nextY = isRelative ? currentY + curve[5] : curve[5];
+        drawTo(nextX, nextY);
+      }
+
+      continue;
+    }
+
+    if (lowerCommand === 's' || lowerCommand === 'q') {
+      while (true) {
+        const curve = readNumbers(4);
+
+        if (!curve) {
+          break;
+        }
+
+        const nextX = isRelative ? currentX + curve[2] : curve[2];
+        const nextY = isRelative ? currentY + curve[3] : curve[3];
+        drawTo(nextX, nextY);
+      }
+
+      continue;
+    }
+
+    if (lowerCommand === 't') {
+      while (true) {
+        const curve = readNumbers(2);
+
+        if (!curve) {
+          break;
+        }
+
+        const nextX = isRelative ? currentX + curve[0] : curve[0];
+        const nextY = isRelative ? currentY + curve[1] : curve[1];
+        drawTo(nextX, nextY);
+      }
+
+      continue;
+    }
+
+    if (lowerCommand === 'a') {
+      while (true) {
+        const arc = readNumbers(7);
+
+        if (!arc) {
+          break;
+        }
+
+        const nextX = isRelative ? currentX + arc[5] : arc[5];
+        const nextY = isRelative ? currentY + arc[6] : arc[6];
+        drawTo(nextX, nextY);
+      }
+    }
+  }
+
+  return drewSegment;
 }
 
 function fillRect(grid, x, y, width, height) {
@@ -311,20 +592,33 @@ function buildPixelGrid(svgContent) {
         continue;
       }
 
-      const pathProperties = new svgPathProperties(d);
-      const length = pathProperties.getTotalLength();
-      const steps = Math.max(20, Math.ceil(length * avgScale * 5));
+      const pathSampler = createPathSampler(d);
 
-      for (let i = 0; i <= steps; i += 1) {
-        const point = pathProperties.getPointAtLength((i / steps) * length);
-        stampPixel(grid, toGridX(point.x), toGridY(point.y), radius);
+      if (pathSampler) {
+        const { pathProperties, length } = pathSampler;
+        const steps = Math.max(20, Math.ceil(length * avgScale * 5));
+
+        for (let i = 0; i <= steps; i += 1) {
+          const point = pathProperties.getPointAtLength((i / steps) * length);
+          stampPixel(grid, toGridX(point.x), toGridY(point.y), radius);
+        }
+
+        continue;
       }
+
+      drawPathFallbackSegments(grid, d, toGridX, toGridY, radius);
 
       continue;
     }
   }
 
   return grid;
+}
+
+function buildCleanedGrid(svgContent) {
+  const baseGrid = buildPixelGrid(svgContent);
+  const bridgedGrid = bridgeGaps(baseGrid);
+  return removeIsolatedPixels(bridgedGrid);
 }
 
 function bridgeGaps(grid) {
@@ -444,6 +738,10 @@ export function renderPixelSvg(rects) {
 
 export function extractCellsFromPixelSvg(svgContent) {
   return extractPixelCellsFromSvg(svgContent).map(([x, y]) => [x, y]);
+}
+
+export function extractPixelCellsFromSourceSvg(svgContent) {
+  return gridToPixelCells(buildCleanedGrid(svgContent));
 }
 
 function sanitizeTag(tag) {
@@ -818,9 +1116,7 @@ async function convertIcon(id, canonicalTagMap, dryRun) {
   const sourcePath = path.join(sourceDir, `${id}.svg`);
   const outputPath = path.join(packageDir, `${id}.svg`);
   const sourceSvg = await fs.readFile(sourcePath, 'utf8');
-  const baseGrid = buildPixelGrid(sourceSvg);
-  const bridgedGrid = bridgeGaps(baseGrid);
-  const cleanedGrid = removeIsolatedPixels(bridgedGrid);
+  const cleanedGrid = buildCleanedGrid(sourceSvg);
   const rects = gridToRects(cleanedGrid);
   let pixelCells = gridToPixelCells(cleanedGrid);
   let wroteSvg = false;

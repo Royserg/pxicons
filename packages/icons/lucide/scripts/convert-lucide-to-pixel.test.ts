@@ -4,6 +4,8 @@ import {
   buildTags,
   evaluateQuality,
   extractCellsFromPixelSvg,
+  extractPixelCellsFromSourceSvg,
+  normalizePathDataForSampling,
   parseCliArgs,
   renderPixelSvg,
   resolveCanonicalIconIds,
@@ -99,6 +101,26 @@ describe('convert-lucide-to-pixel helpers', () => {
       [4, 10],
       [9, 14]
     ]);
+  });
+
+  it('normalizes compact negative path values for robust path sampling', () => {
+    const compactPath = 'm14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999';
+    const normalizedPath = normalizePathDataForSampling(compactPath);
+
+    expect(normalizedPath).toContain('13 -8.381');
+  });
+
+  it('falls back to endpoint segments when compact path data cannot be fully sampled', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
+</svg>`;
+
+    const cells = extractPixelCellsFromSourceSvg(svg);
+    const keys = new Set(cells.map(([x, y]) => `${x},${y}`));
+
+    expect(cells.length).toBeGreaterThan(0);
+    expect(keys.has('10,10')).toBe(true);
+    expect(keys.has('6,20')).toBe(true);
   });
 });
 
