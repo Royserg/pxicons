@@ -34,6 +34,7 @@ const packageDir = path.resolve(__dirname, '..');
 
 const NON_RUNTIME_EXPORTS = new Set(['./package.json']);
 const RUNTIME_EXPORT_KEYS = ['default', 'svelte', 'import', 'require'] as const;
+const JSR_DIST_PREFIX = './dist-jsr/';
 
 function readPackageJson<T>(relativePath: string): T {
   return JSON.parse(readFileSync(path.join(packageDir, relativePath), 'utf8')) as T;
@@ -73,7 +74,7 @@ function normalizeExports(
       continue;
     }
 
-    normalized[subpath] = resolveRuntimeTarget(exportValue);
+    normalized[subpath] = resolveRuntimeTarget(exportValue).replace('./dist/', JSR_DIST_PREFIX);
   }
 
   return normalized;
@@ -106,7 +107,7 @@ describe('@pxicons/lucide-svelte release surface', () => {
     }
 
     for (const exportTarget of Object.values(jsrConfig.exports)) {
-      expect(exportTarget.startsWith('./dist/')).toBe(true);
+      expect(exportTarget.startsWith(JSR_DIST_PREFIX)).toBe(true);
     }
   });
 });

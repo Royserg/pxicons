@@ -1,12 +1,24 @@
 # Releasing `@pxicons/lucide-svelte`
 
-This package is published to npm first, with a required JSR dry-run gate before npm publish.
+This package uses a coupled release policy: npm publish is blocked unless the JSR dry-run gate passes.
+
+The package now ships two build artifacts during release validation:
+
+- `dist/` for npm package contents
+- `dist-jsr/` for JSR runtime exports (no `.svelte` modules in exported JS graph)
 
 ## Prerequisites
 
 - Run `vp install` from the monorepo root.
 - Ensure npm auth is ready for the `@pxicons` scope.
 - Ensure JSR auth is ready (`JSR_TOKEN` or interactive login for `jsr publish`).
+
+Optional quick checks:
+
+```bash
+vp pm whoami
+printenv JSR_TOKEN | wc -c
+```
 
 ## Local Release Commands
 
@@ -19,11 +31,13 @@ From `packages/frameworks/lucide-svelte`:
    ```
 
    This runs:
-   - build, tests, and `jsr.json` sync
+   - `build` (`dist/`) and `build:jsr` (`dist-jsr/`)
+   - tests
+   - `jsr.json` sync
    - npm publish dry-run
    - JSR publish dry-run
 
-2. Publish to npm:
+2. Publish to npm (coupled gate enforced):
 
    ```bash
    vp run release:npm
@@ -40,9 +54,6 @@ From `packages/frameworks/lucide-svelte`:
 JSR currently rejects wildcard export entries such as `./icons/*`.
 The `sync:jsr` script therefore omits wildcard subpath exports by default and keeps only `.` and `./icons`.
 
-JSR also currently rejects this package's `.svelte` module graph during `jsr publish --dry-run`.
-With the current release policy, `release:check` and `release:npm` will stay blocked until JSR supports `.svelte` modules or the JSR entrypoints are redesigned.
-
 If wildcard support is added in the future and you want to test it, regenerate `jsr.json` with:
 
 ```bash
@@ -53,4 +64,13 @@ Then validate with:
 
 ```bash
 vp run release:check
+```
+
+## Registry Verification
+
+After publish, verify both registries:
+
+```bash
+vp info @pxicons/lucide-svelte
+vp dlx -- jsr info @pxicons/lucide-svelte
 ```

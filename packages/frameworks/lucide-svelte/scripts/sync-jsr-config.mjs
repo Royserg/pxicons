@@ -10,6 +10,7 @@ const jsrConfigPath = path.join(packageDir, 'jsr.json');
 
 const JSR_SCHEMA_URL = 'https://jsr.io/schema/config-file.v1.json';
 const NON_RUNTIME_EXPORTS = new Set(['./package.json']);
+const JSR_DIST_PREFIX = './dist-jsr/';
 
 function resolveRuntimeTarget(exportValue) {
   if (typeof exportValue === 'string') {
@@ -34,7 +35,7 @@ function resolveRuntimeTarget(exportValue) {
 
 function normalizeJsrExports(packageExports) {
   if (!packageExports || typeof packageExports !== 'object') {
-    return { '.': './dist/lucide/index.js' };
+    return { '.': `${JSR_DIST_PREFIX}lucide/index.js` };
   }
 
   const jsrExports = {};
@@ -58,11 +59,11 @@ function normalizeJsrExports(packageExports) {
       );
     }
 
-    jsrExports[subpath] = runtimeTarget;
+    jsrExports[subpath] = runtimeTarget.replace('./dist/', JSR_DIST_PREFIX);
   }
 
   if (Object.keys(jsrExports).length === 0) {
-    jsrExports['.'] = './dist/lucide/index.js';
+    jsrExports['.'] = `${JSR_DIST_PREFIX}lucide/index.js`;
   }
 
   return jsrExports;
