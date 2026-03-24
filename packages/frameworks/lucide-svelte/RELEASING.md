@@ -1,5 +1,13 @@
 # Releasing `@pxicons/lucide-svelte`
 
+## Monorepo Publish Order
+
+When releasing all framework packages together, publish in this order:
+
+1. `@pxicons/lucide`
+2. `@pxicons/lucide-react`
+3. `@pxicons/lucide-svelte`
+
 This package uses a coupled release policy: npm publish is blocked unless the JSR dry-run gate passes.
 
 The package now ships two build artifacts during release validation:
@@ -43,11 +51,15 @@ From `packages/frameworks/lucide-svelte`:
    vp run release:npm
    ```
 
+   This script publishes with `--no-git-checks`, so uncommitted working tree changes do not block the npm publish step.
+
 3. Publish to JSR:
 
    ```bash
    vp run release:jsr
    ```
+
+   This script publishes with `--allow-dirty`, so uncommitted working tree changes do not block the JSR publish step.
 
 ## JSR Wildcard Exports
 

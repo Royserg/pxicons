@@ -36,17 +36,46 @@
 		...(dev ? ([{ id: 'edit', label: 'Edit' }] as const) : [])
 	] as const;
 
+	interface UsageSnippetContext {
+		componentName: string;
+		iconId: string;
+	}
+
 	const usageTabs = [
 		{
 			id: 'svelte',
 			label: 'Svelte',
 			language: 'svelte',
 			packageName: '@pxicons/lucide-svelte',
-			snippet: (componentName: string): string => `<script>
+			snippet: ({ componentName }: UsageSnippetContext): string => `<script>
   import { ${componentName} } from '@pxicons/lucide-svelte';
 <\/script>
 
 <${componentName} />`
+		},
+		{
+			id: 'vanilla',
+			label: 'Vanilla',
+			language: 'html',
+			packageName: '@pxicons/lucide',
+			snippet: ({ iconId }: UsageSnippetContext): string => `<script type="module">
+  import { createIcons } from '@pxicons/lucide';
+
+  createIcons();
+<\/script>
+
+<i data-px="lucide:${iconId}"></i>`
+		},
+		{
+			id: 'react',
+			label: 'React',
+			language: 'tsx',
+			packageName: '@pxicons/lucide-react',
+			snippet: ({ componentName }: UsageSnippetContext): string => `import { ${componentName} } from '@pxicons/lucide-react';
+
+export function App() {
+  return <${componentName} size={24} color="currentColor" />;
+}`
 		}
 	] as const;
 
@@ -176,11 +205,14 @@
 	);
 
 	const usageSnippet = $derived.by(() => {
-		if (!selectedIconComponentName) {
+		if (!selectedIcon || !selectedIconComponentName) {
 			return '';
 		}
 
-		return activeUsageTabConfig.snippet(selectedIconComponentName);
+		return activeUsageTabConfig.snippet({
+			componentName: selectedIconComponentName,
+			iconId: selectedIcon.id
+		});
 	});
 
 	const customizeSourceSvg = $derived.by(() => {

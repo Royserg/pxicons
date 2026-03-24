@@ -1,19 +1,35 @@
 {
   "name": "@pxicons/lucide",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Lucide pixel-art icons for vanilla JavaScript and shared framework data.",
+  "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "convert": "node ./scripts/convert-lucide-to-pixel.mjs"
+    "convert": "node ./scripts/convert-lucide-to-pixel.mjs",
+    "generate": "node ./scripts/generate-runtime.mjs",
+    "build": "vp run generate",
+    "test:consistency": "vp test -- --run src/runtime-consistency.test.ts",
+    "test": "vp test",
+    "prepublishOnly": "vp run build"
   },
   "exports": {
     ".": "./src/index.ts",
+    "./icons": "./src/generated/icons/index.ts",
+    "./icons/*": "./src/generated/icons/*.ts",
     "./*.svg": "./*.svg",
     "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@pxicons/lucide-core": "workspace:*"
   },
   "devDependencies": {
     "fast-xml-parser": "^5.5.5",
     "lucide-static": "^0.577.0",
-    "svg-path-properties": "^2.0.2"
+    "svg-path-properties": "^2.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

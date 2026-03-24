@@ -23,4 +23,3 @@ dist-ssr
 *.sln
 *.sw?
 /.svelte-kit
-/packages/frameworks/lucide-svelte/dist-jsr/lucide

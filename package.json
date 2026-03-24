@@ -7,11 +7,12 @@
     "ready": "vp fmt && vp lint && vp run test -r && vp run build -r",
     "dev": "vp run web#dev",
     "dev:playground": "vp run lucide-svelte#build && vp run web#dev",
-    "frameworks:generate": "vp run lucide-svelte#generate",
-    "frameworks:drift-check": "vp run lucide-svelte#test:consistency",
-    "frameworks:test": "vp run lucide-svelte#test",
-    "frameworks:build": "vp run lucide-svelte#build",
-    "frameworks:verify": "vp run frameworks:generate && vp run frameworks:drift-check && vp run frameworks:test"
+    "verify:source-exports": "node ./tools/verify-source-exports.mjs",
+    "frameworks:generate": "vp run lucide#generate && vp run lucide-react#generate && vp run lucide-svelte#generate",
+    "frameworks:drift-check": "vp run lucide#test:consistency && vp run lucide-react#test:consistency && vp run lucide-svelte#test:consistency",
+    "frameworks:test": "vp run lucide-core#test && vp run lucide#test && vp run lucide-react#test && vp run lucide-svelte#test",
+    "frameworks:build": "vp run lucide#build && vp run lucide-react#build && vp run lucide-svelte#build",
+    "frameworks:verify": "vp run verify:source-exports && vp run frameworks:generate && vp run frameworks:drift-check && vp run frameworks:test && vp run frameworks:build"
   },
   "devDependencies": {
     "vite-plus": "catalog:"

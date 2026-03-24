@@ -1,0 +1,27 @@
+const A11Y_ATTRIBUTES = [
+  'aria-label',
+  'aria-labelledby',
+  'aria-describedby',
+  'role',
+  'aria-hidden'
+] as const;
+
+export function hasA11yProp(props: Record<string, unknown>): boolean {
+  return A11Y_ATTRIBUTES.some((attribute) => {
+    const value = props[attribute];
+
+    if (value === undefined || value === null) {
+      return false;
+    }
+
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      return value.trim().length > 0;
+    }
+
+    return true;
+  });
+}

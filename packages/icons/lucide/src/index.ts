@@ -2,21 +2,37 @@
 
 import { iconManifest } from './icon-manifest';
 import { extractPixelCellsFromSvg } from '../svg-geometry.mjs';
+import { iconsById } from './generated/icons/registry.js';
+
 export {
   buildRectRunsFromPixelCells,
   extractPixelCellsFromSvg,
   extractPixelRectRunsFromSvg
 } from '../svg-geometry.mjs';
 export type { PixelCell, PixelRectRun } from '../svg-geometry.mjs';
-import type { PixelCell } from '../svg-geometry.mjs';
+
+import type { LucideIconDefinition, PixelCell, PixelShape } from '@pxicons/lucide-core';
+
+export type { IconRenderMode, LucideIconDefinition, PixelShape } from '@pxicons/lucide-core';
+
+export {
+  createIcons,
+  iconToSvg,
+  replaceElement,
+  type CreateIconsOptions,
+  type CreateIconsResult,
+  type IconRenderOptions,
+  type ReplaceElementOptions
+} from './vanilla.js';
+
+export * from './generated/icons/index.js';
+export { icons, iconsById } from './generated/icons/registry.js';
 
 const rawSvgModules = import.meta.glob('../*.svg', {
   query: '?raw',
   import: 'default',
   eager: true
 }) as Record<string, string>;
-
-export type PixelShape = 'square' | 'circle' | 'rounded';
 
 export interface PixelIcon {
   id: string;
@@ -76,6 +92,12 @@ export const lucideIcons: readonly PixelIcon[] = Object.freeze(
     .filter((entry): entry is PixelIcon => entry !== null)
 );
 
+export const lucideIconDefinitions: Readonly<Record<string, LucideIconDefinition>> = Object.freeze(iconsById);
+
 export function getLucideIcon(id: string): PixelIcon | undefined {
   return lucideIcons.find((icon) => icon.id === id);
+}
+
+export function getLucideIconDefinition(id: string): LucideIconDefinition | undefined {
+  return lucideIconDefinitions[id];
 }

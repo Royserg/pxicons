@@ -56,15 +56,18 @@
     "test:consistency": "vp test -- --run tests/lucide-consistency.test.ts",
     "test": "vp test",
     "release:verify": "vp run build && vp run build:jsr && vp run test && vp run sync:jsr",
-    "release:npm:dry-run": "$HOME/.vite-plus/bin/vp pm publish -- --dry-run --no-git-checks",
-    "release:jsr:dry-run": "$HOME/.vite-plus/bin/vp dlx -- jsr publish --dry-run --allow-dirty",
+    "release:npm:dry-run": "vp pm publish -- --dry-run --no-git-checks",
+    "release:jsr:dry-run": "vpx -- jsr publish --dry-run --allow-dirty",
     "release:check": "vp run release:verify && vp run release:npm:dry-run && vp run release:jsr:dry-run",
-    "release:npm": "vp run release:check && $HOME/.vite-plus/bin/vp pm publish",
-    "release:jsr": "vp run release:verify && vp run release:jsr:dry-run && $HOME/.vite-plus/bin/vp dlx -- jsr publish",
+    "release:npm": "vp run release:check && vp pm publish -- --no-git-checks",
+    "release:jsr": "vp run release:verify && vp run release:jsr:dry-run && vpx -- jsr publish --allow-dirty",
     "prepublishOnly": "vp run build"
   },
   "peerDependencies": {
     "svelte": "^5.0.0"
+  },
+  "dependencies": {
+    "@pxicons/lucide-core": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/package": "^2.5.0",
