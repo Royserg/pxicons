@@ -13,10 +13,8 @@
 </svelte:head>
 
 <main class="mx-auto flex max-w-310 flex-col gap-4 p-4 py-2">
-	<header class="flex justify-start rounded-xl p-2">
-		<h2 class="text-3xl">
-			<strong>PxIcons</strong>
-		</h2>
+	<header class="flex justify-start rounded-xl">
+		<img src={favicon} alt="logo" class="size-20" />
 	</header>
 
 	{@render children()}
