@@ -42,7 +42,7 @@
 		"vite": "catalog:",
 		"vite-plugin-devtools-json": "^1.0.0",
 		"vite-plus": "catalog:",
-		"wrangler": "^4.63.0"
+		"wrangler": "catalog:"
 	},
 	"dependencies": {
 		"@pxicons/lucide": "workspace:*",

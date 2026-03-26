@@ -1,8 +1,8 @@
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "web",
+	"name": "px-icons",
 	"compatibility_date": "2026-03-14",
-	"compatibility_flags": ["nodejs_als"],
+	"compatibility_flags": ["nodejs_als", "nodejs_compat"],
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"assets": {
 		"binding": "ASSETS",
