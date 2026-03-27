@@ -4,4 +4,4 @@ export * from './icons/index.js';
 export * as icons from './icons/index.js';
 export { default as Icon } from './Icon.js';
 export type { IconProps } from './types.js';
-export type { IconRenderMode, PixelShape } from '@pxicons/lucide-core';
+export type { IconRenderMode, PixelShape } from '@pxicons/lucide/_core';

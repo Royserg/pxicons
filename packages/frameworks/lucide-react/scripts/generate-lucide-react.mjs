@@ -7,7 +7,7 @@ import { generateLucideEntries } from '../../../../tools/lucide-generator/index.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const packageDir = path.resolve(__dirname, '..');
-const lucideDir = path.resolve(packageDir, '../../icons/lucide');
+const lucideDir = path.resolve(packageDir, '../lucide');
 const outputDir = path.join(packageDir, 'src/lucide');
 const iconsOutputDir = path.join(outputDir, 'icons');
 
@@ -26,7 +26,7 @@ async function writeFile(filePath, content) {
 function createTypesFile() {
   return `${GENERATED_HEADER}
 import type { SVGProps } from 'react';
-import type { IconPixels, IconRects, IconRenderMode, PixelShape } from '@pxicons/lucide-core';
+import type { IconPixels, IconRects, IconRenderMode, PixelShape } from '@pxicons/lucide/_core';
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'color'> {
   name?: string;
@@ -59,7 +59,7 @@ function createIconBaseFile() {
   return `${GENERATED_HEADER}
 import { forwardRef, type ReactNode } from 'react';
 
-import { hasA11yProp, resolveIconRenderModel, type PixelShape } from '@pxicons/lucide-core';
+import { hasA11yProp, resolveIconRenderModel, type PixelShape } from '@pxicons/lucide/_core';
 
 import defaultAttributes from './default-attributes.js';
 import type { IconProps } from './types.js';
@@ -273,7 +273,7 @@ export * from './icons/index.js';
 export * as icons from './icons/index.js';
 export { default as Icon } from './Icon.js';
 export type { IconProps } from './types.js';
-export type { IconRenderMode, PixelShape } from '@pxicons/lucide-core';
+export type { IconRenderMode, PixelShape } from '@pxicons/lucide/_core';
 `;
 }
 

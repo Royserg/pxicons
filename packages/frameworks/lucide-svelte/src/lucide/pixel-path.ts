@@ -4,5 +4,5 @@ export {
   normalizeRenderMode,
   normalizeShape,
   resolveOptimizedPathData
-} from '@pxicons/lucide-core';
-export type { OptimizedPathOptions } from '@pxicons/lucide-core';
+} from '@pxicons/lucide/_core';
+export type { OptimizedPathOptions } from '@pxicons/lucide/_core';

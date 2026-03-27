@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import {
   buildRectRunsFromPixelCells,
   extractPixelCellsFromSvg
-} from '../../packages/icons/lucide/svg-geometry.mjs';
+} from '../../packages/frameworks/lucide/svg-geometry.mjs';
 
 function evaluateTsModule(source, exportName) {
   const module = { exports: {} };

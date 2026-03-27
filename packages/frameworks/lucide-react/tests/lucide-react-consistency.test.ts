@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 
-import { iconManifest } from '../../../icons/lucide/src/icon-manifest';
+import { iconManifest } from '../../lucide/src/icon-manifest';
 import * as iconComponents from '../src/lucide/icons/index';
 
 function toPascalCase(iconId: string): string {

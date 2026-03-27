@@ -23,7 +23,7 @@ describe('PUT /api/dev/icons/[iconId]/svg', () => {
 		mocks.saveIconSvgFile.mockResolvedValue({
 			ok: true,
 			iconId: 'settings',
-			path: '/repo/packages/icons/lucide/settings.svg',
+			path: '/repo/packages/frameworks/lucide/settings.svg',
 			savedAt: '2026-03-19T10:00:00.000Z',
 			frameworkSync: {
 				status: 'ok',
@@ -62,7 +62,7 @@ describe('PUT /api/dev/icons/[iconId]/svg', () => {
 		mocks.saveIconSvgFile.mockResolvedValue({
 			ok: true,
 			iconId: 'settings',
-			path: '/repo/packages/icons/lucide/settings.svg',
+			path: '/repo/packages/frameworks/lucide/settings.svg',
 			savedAt: '2026-03-19T10:00:00.000Z',
 			frameworkSync: {
 				status: 'failed',

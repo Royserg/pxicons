@@ -2,7 +2,7 @@
 
 import { forwardRef, type ReactNode } from 'react';
 
-import { hasA11yProp, resolveIconRenderModel, type PixelShape } from '@pxicons/lucide-core';
+import { hasA11yProp, resolveIconRenderModel, type PixelShape } from '@pxicons/lucide/_core';
 
 import defaultAttributes from './default-attributes.js';
 import type { IconProps } from './types.js';

@@ -67,7 +67,7 @@
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@pxicons/lucide-core": "workspace:*"
+    "@pxicons/lucide": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/package": "^2.5.0",

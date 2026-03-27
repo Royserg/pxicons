@@ -8,7 +8,7 @@ export default defineConfig({
 	server: {
 		watch: {
 			// Edit tab writes icon SVG source files directly; avoid full-page reload on save.
-			ignored: ['**/packages/icons/lucide/*.svg']
+			ignored: ['**/packages/frameworks/lucide/*.svg']
 		}
 	},
 	test: {

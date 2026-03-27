@@ -6,7 +6,7 @@ import { generateLucideEntries } from '../../../../tools/lucide-generator/index.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const packageDir = path.resolve(__dirname, '..');
-const lucideDir = path.resolve(packageDir, '../../icons/lucide');
+const lucideDir = path.resolve(packageDir, '../lucide');
 const outputDir = path.join(packageDir, 'src/lucide');
 const iconsOutputDir = path.join(outputDir, 'icons');
 const utilsOutputDir = path.join(outputDir, 'utils');
@@ -65,8 +65,8 @@ export default defaultAttributes;
 
 function createPixelStrokeFile() {
   return `${GENERATED_HEADER}
-export { resolvePixelGeometry } from '@pxicons/lucide-core';
-export type { PixelGeometry, PixelGeometryOptions } from '@pxicons/lucide-core';
+export { resolvePixelGeometry } from '@pxicons/lucide/_core';
+export type { PixelGeometry, PixelGeometryOptions } from '@pxicons/lucide/_core';
 `;
 }
 
@@ -76,14 +76,14 @@ export {
   normalizeRenderMode,
   normalizeShape,
   resolveOptimizedPathData
-} from '@pxicons/lucide-core';
-export type { OptimizedPathOptions } from '@pxicons/lucide-core';
+} from '@pxicons/lucide/_core';
+export type { OptimizedPathOptions } from '@pxicons/lucide/_core';
 `;
 }
 
 function createHasA11yPropFile() {
   return `${GENERATED_HEADER}
-export { hasA11yProp } from '@pxicons/lucide-core';
+export { hasA11yProp } from '@pxicons/lucide/_core';
 `;
 }
 

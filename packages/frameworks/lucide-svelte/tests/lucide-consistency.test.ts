@@ -7,12 +7,12 @@ import { describe, expect, it } from 'vite-plus/test';
 import {
   buildRectRunsFromPixelCells,
   extractPixelCellsFromSvg
-} from '../../../icons/lucide/svg-geometry.mjs';
+} from '../../lucide/svg-geometry.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const packageDir = path.resolve(__dirname, '..');
-const lucideDir = path.resolve(packageDir, '../../icons/lucide');
+const lucideDir = path.resolve(packageDir, '../lucide');
 
 function evaluateTsModule(source: string, exportName: string) {
   const module = { exports: {} as Record<string, unknown> };

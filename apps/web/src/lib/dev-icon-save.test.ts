@@ -16,7 +16,7 @@ async function createTempRepo(): Promise<{
 	cleanup: () => Promise<void>;
 }> {
 	const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'pxicons-save-'));
-	const lucideDir = path.join(repoRoot, 'packages/icons/lucide');
+	const lucideDir = path.join(repoRoot, 'packages/frameworks/lucide');
 	const appDir = path.join(repoRoot, 'apps/web');
 
 	await mkdir(lucideDir, { recursive: true });
