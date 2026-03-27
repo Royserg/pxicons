@@ -89,3 +89,13 @@ Run the main app:
 ```bash
 vp run dev
 ```
+
+## Report Icon Inconsistencies
+
+If you spot any inconsistency between a Lucide icon and its pixel-art version, please open an issue.
+
+When reporting, include:
+
+- icon name/id
+- a short description of what looks inconsistent
+- a screenshot (if possible)
