@@ -13,9 +13,9 @@ The project currently focuses on **pixel-art Lucide icons** and ships framework-
     <td align="center"><strong>pxicons (Pixel Art)</strong></td>
   </tr>
   <tr>
-    <td align="center"><img src="./docs/images/lucide-settings-original.svg" alt="Original Lucide settings icon" width="112" /></td>
+    <td align="center"><img src="./docs/images/lucide-search-original.svg" alt="Original Lucide search icon" width="112" /></td>
     <td align="center"><strong>→</strong></td>
-    <td align="center"><img src="./packages/frameworks/lucide/settings.svg" alt="Pixel-art settings icon from pxicons" width="112" /></td>
+    <td align="center"><img src="./packages/frameworks/lucide/search.svg" alt="Pixel-art search icon from pxicons" width="112" /></td>
   </tr>
 </table>
 
@@ -89,4 +89,3 @@ Run the main app:
 ```bash
 vp run dev
 ```
-
