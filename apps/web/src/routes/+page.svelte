@@ -71,7 +71,9 @@
 			label: 'React',
 			language: 'tsx',
 			packageName: '@pxicons/lucide-react',
-			snippet: ({ componentName }: UsageSnippetContext): string => `import { ${componentName} } from '@pxicons/lucide-react';
+			snippet: ({
+				componentName
+			}: UsageSnippetContext): string => `import { ${componentName} } from '@pxicons/lucide-react';
 
 export function App() {
   return <${componentName} size={24} color="currentColor" />;
@@ -1660,6 +1662,7 @@ export function App() {
 									</div>
 								{/if}
 							</div>
+
 							<div class="edit-footer-status">
 								{#if editSaveStatus}
 									<p class="customize-hint">{editSaveStatus}</p>
