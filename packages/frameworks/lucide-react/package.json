@@ -49,9 +49,9 @@
     "test:consistency": "vp test -- --run tests/lucide-react-consistency.test.ts",
     "test": "vp test",
     "release:verify": "vp run generate && vp run test:consistency && vp run test && vp run build",
-    "release:npm:dry-run": "vp pm publish -- --dry-run --no-git-checks",
+    "release:npm:dry-run": "vp exec pnpm publish --dry-run --no-git-checks",
     "release:check": "vp run release:verify && vp run release:npm:dry-run",
-    "release:npm": "vp run release:check && vp pm publish -- --no-git-checks",
+    "release:npm": "vp run release:check && vp exec pnpm publish --no-git-checks",
     "prepublishOnly": "vp run build"
   },
   "peerDependencies": {

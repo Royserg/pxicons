@@ -32,6 +32,13 @@
     "build": "vp run generate",
     "test:consistency": "vp test -- --run src/runtime-consistency.test.ts",
     "test": "vp test",
+    "release:verify": "vp run generate && vp run test:consistency && vp run test && vp run build",
+    "release:npm:dry-run": "vp exec pnpm publish --dry-run --no-git-checks",
+    "release:jsr:dry-run": "vpx -- jsr publish --dry-run --allow-dirty",
+    "release:check": "vp run release:verify && vp run release:npm:dry-run",
+    "release:check:all": "vp run release:check && vp run release:jsr:dry-run",
+    "release:npm": "vp run release:check && vp exec pnpm publish --no-git-checks",
+    "release:jsr": "vp run release:verify && vp run release:jsr:dry-run && vpx -- jsr publish --allow-dirty",
     "prepublishOnly": "vp run build"
   },
   "exports": {

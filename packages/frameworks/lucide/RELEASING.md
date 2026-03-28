@@ -4,24 +4,32 @@
 
 - From repo root, run `vp install`.
 - Ensure npm auth for `@pxicons` is ready.
+- Optional: ensure JSR auth is ready (`JSR_TOKEN`) if you plan to publish to JSR.
 
 ## Validate
 
 From `packages/frameworks/lucide`:
 
 ```bash
-vp run generate
-vp run test
+vp run release:check
 ```
 
-## Dry Run
+`release:check` runs generation, tests, and npm dry-run validation.
+
+If you also want to validate the optional JSR path:
 
 ```bash
-vp pm publish -- --dry-run --no-git-checks
+vp run release:check:all
 ```
 
-## Publish
+## Publish (npm)
 
 ```bash
-vp pm publish -- --no-git-checks
+vp run release:npm
+```
+
+## Publish (JSR, Optional)
+
+```bash
+vp run release:jsr
 ```
