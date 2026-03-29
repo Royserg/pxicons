@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src/lucide",
+    "outDir": "./dist/lucide",
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": false,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "types": ["react", "react-dom"],
+    "stripInternal": false
+  },
+  "include": ["src/lucide/**/*.ts", "src/lucide/**/*.tsx"]
+}

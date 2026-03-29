@@ -1,0 +1,59 @@
+{
+  "name": "@pxicons/lucide",
+  "version": "0.1.0",
+  "description": "Lucide pixel-art icons for vanilla JavaScript and shared framework data.",
+  "license": "MIT",
+  "type": "module",
+  "types": "./src/index.ts",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Royserg/pxicons.git",
+    "directory": "packages/frameworks/lucide"
+  },
+  "homepage": "https://github.com/Royserg/pxicons/tree/dev/packages/frameworks/lucide#readme",
+  "bugs": {
+    "url": "https://github.com/Royserg/pxicons/issues"
+  },
+  "keywords": [
+    "icons",
+    "lucide",
+    "pixel-art",
+    "vanilla",
+    "svg"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "convert": "node ./scripts/convert-lucide-to-pixel.mjs",
+    "sync:core": "node ./scripts/sync-core-from-shared.mjs",
+    "generate": "vp run sync:core && node ./scripts/generate-runtime.mjs",
+    "build": "vp run generate",
+    "test:consistency": "vp test -- --run src/runtime-consistency.test.ts",
+    "test": "vp test",
+    "release:verify": "vp run generate && vp run test:consistency && vp run test && vp run build",
+    "release:npm:dry-run": "vp exec pnpm publish --dry-run --no-git-checks",
+    "release:jsr:dry-run": "vpx -- jsr publish --dry-run --allow-dirty",
+    "release:check": "vp run release:verify && vp run release:npm:dry-run",
+    "release:check:all": "vp run release:check && vp run release:jsr:dry-run",
+    "release:npm": "vp run release:check && vp exec pnpm publish --no-git-checks",
+    "release:jsr": "vp run release:verify && vp run release:jsr:dry-run && vpx -- jsr publish --allow-dirty",
+    "prepublishOnly": "vp run build"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./_core": "./src/_core/index.ts",
+    "./icons": "./src/generated/icons/index.ts",
+    "./icons/*": "./src/generated/icons/*.ts",
+    "./*.svg": "./*.svg",
+    "./package.json": "./package.json"
+  },
+  "devDependencies": {
+    "fast-xml-parser": "^5.5.5",
+    "lucide-static": "^0.577.0",
+    "svg-path-properties": "^2.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

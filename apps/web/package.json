@@ -1,0 +1,53 @@
+{
+	"name": "web",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vp dev",
+		"build": "tsc && vp build",
+		"preview": "wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"lint": "prettier --check .",
+		"format": "prettier --write .",
+		"test:unit": "vp test",
+		"test": "vp test run",
+		"gen": "wrangler types"
+	},
+	"devDependencies": {
+		"@codemirror/lang-xml": "^6.1.0",
+		"@codemirror/state": "^6.6.0",
+		"@codemirror/view": "^6.40.0",
+		"@lucide/svelte": "^0.577.0",
+		"@sveltejs/adapter-cloudflare": "^7.2.6",
+		"@sveltejs/kit": "^2.50.2",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@tailwindcss/vite": "^4.1.18",
+		"bits-ui": "^2.16.3",
+		"clsx": "^2.1.1",
+		"jsdom": "^29.0.0",
+		"prettier": "^3.8.1",
+		"prettier-plugin-svelte": "^3.4.1",
+		"prettier-plugin-tailwindcss": "^0.7.2",
+		"svelte": "^5.51.0",
+		"svelte-check": "^4.4.2",
+		"tailwind-merge": "^3.5.0",
+		"tailwind-variants": "^3.2.2",
+		"tailwindcss": "^4.1.18",
+		"tw-animate-css": "^1.4.0",
+		"typescript": "^5.9.3",
+		"vaul-svelte": "1.0.0-next.7",
+		"vite": "catalog:",
+		"vite-plugin-devtools-json": "^1.0.0",
+		"vite-plus": "catalog:",
+		"wrangler": "catalog:"
+	},
+	"dependencies": {
+		"@pxicons/lucide": "workspace:*",
+		"@pxicons/lucide-svelte": "workspace:*",
+		"@tanstack/svelte-virtual": "^3.13.23",
+		"geist-svelte": "^1.0.2"
+	}
+}

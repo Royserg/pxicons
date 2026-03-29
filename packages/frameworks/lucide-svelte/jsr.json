@@ -1,0 +1,10 @@
+{
+  "$schema": "https://jsr.io/schema/config-file.v1.json",
+  "exports": {
+    ".": "./dist-jsr/lucide/index.js",
+    "./icons": "./dist-jsr/lucide/icons/index.js"
+  },
+  "license": "MIT",
+  "name": "@pxicons/lucide-svelte",
+  "version": "0.1.0"
+}

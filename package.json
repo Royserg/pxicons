@@ -5,7 +5,14 @@
   "type": "module",
   "scripts": {
     "ready": "vp fmt && vp lint && vp run test -r && vp run build -r",
-    "dev": "vp run website#dev"
+    "dev": "vp run web#dev",
+    "dev:playground": "vp run lucide-svelte#build && vp run web#dev",
+    "verify:source-exports": "node ./tools/verify-source-exports.mjs",
+    "frameworks:generate": "vp run lucide#generate && vp run lucide-react#generate && vp run lucide-svelte#generate",
+    "frameworks:drift-check": "vp run lucide#test:consistency && vp run lucide-react#test:consistency && vp run lucide-svelte#test:consistency",
+    "frameworks:test": "vp run lucide-core#test && vp run lucide#test && vp run lucide-react#test && vp run lucide-svelte#test",
+    "frameworks:build": "vp run lucide#build && vp run lucide-react#build && vp run lucide-svelte#build",
+    "frameworks:verify": "vp run verify:source-exports && vp run frameworks:generate && vp run frameworks:drift-check && vp run frameworks:test && vp run frameworks:build"
   },
   "devDependencies": {
     "vite-plus": "catalog:"
@@ -13,5 +20,10 @@
   "engines": {
     "node": ">=22.12.0"
   },
-  "packageManager": "pnpm@10.32.1"
+  "packageManager": "pnpm@10.32.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
 }

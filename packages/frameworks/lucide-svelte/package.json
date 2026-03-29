@@ -1,0 +1,82 @@
+{
+  "name": "@pxicons/lucide-svelte",
+  "version": "0.1.0",
+  "description": "Lucide pixel-art icon components for Svelte.",
+  "license": "MIT",
+  "type": "module",
+  "types": "./dist/lucide/index.d.ts",
+  "svelte": "./dist/lucide/index.js",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Royserg/pxicons.git",
+    "directory": "packages/frameworks/lucide-svelte"
+  },
+  "homepage": "https://github.com/Royserg/pxicons/tree/dev/packages/frameworks/lucide-svelte#readme",
+  "bugs": {
+    "url": "https://github.com/Royserg/pxicons/issues"
+  },
+  "keywords": [
+    "icons",
+    "lucide",
+    "pixel-art",
+    "svelte",
+    "svelte-icons"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/lucide/index.d.ts",
+      "svelte": "./dist/lucide/index.js",
+      "default": "./dist/lucide/index.js"
+    },
+    "./icons": {
+      "types": "./dist/lucide/icons/index.d.ts",
+      "svelte": "./dist/lucide/icons/index.js",
+      "default": "./dist/lucide/icons/index.js"
+    },
+    "./icons/*": {
+      "types": "./dist/lucide/icons/*.svelte.d.ts",
+      "svelte": "./dist/lucide/icons/*.js",
+      "default": "./dist/lucide/icons/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "generate": "node ./scripts/generate-lucide.mjs",
+    "sync:jsr": "node ./scripts/sync-jsr-config.mjs",
+    "build:jsr": "node ./scripts/build-jsr-artifact.mjs",
+    "build": "vp run generate && svelte-package --input ./src --output ./dist",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test:consistency": "vp test -- --run tests/lucide-consistency.test.ts",
+    "test": "vp test",
+    "release:verify": "vp run build && vp run build:jsr && vp run test && vp run sync:jsr",
+    "release:npm:dry-run": "vp exec pnpm publish --dry-run --no-git-checks",
+    "release:jsr:dry-run": "vpx -- jsr publish --dry-run --allow-dirty",
+    "release:check": "vp run release:verify && vp run release:npm:dry-run && vp run release:jsr:dry-run",
+    "release:npm": "vp run release:check && vp exec pnpm publish --no-git-checks",
+    "release:jsr": "vp run release:verify && vp run release:jsr:dry-run && vpx -- jsr publish --allow-dirty",
+    "prepublishOnly": "vp run build"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  },
+  "dependencies": {
+    "@pxicons/lucide": "workspace:*"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2.5.0",
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "@types/node": "^24",
+    "svelte": "^5.51.0",
+    "svelte-check": "^4.4.2",
+    "typescript": "^5",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

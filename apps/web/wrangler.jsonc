@@ -1,0 +1,23 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "px-icons",
+	"compatibility_date": "2026-03-14",
+	"compatibility_flags": ["nodejs_als", "nodejs_compat"],
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	"routes": [
+		{
+			"pattern": "pxicons.org",
+			"custom_domain": true
+		},
+		{
+			"pattern": "www.pxicons.org",
+			"custom_domain": true
+		}
+	],
+	"workers_dev": false,
+	"preview_urls": true
+}

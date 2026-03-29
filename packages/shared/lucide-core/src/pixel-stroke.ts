@@ -1,0 +1,22 @@
+import type { PixelGeometry, PixelGeometryOptions } from './types.ts';
+
+export function resolvePixelGeometry(options: PixelGeometryOptions): PixelGeometry {
+  const strokeWidth = options.strokeWidth ?? 2;
+  const size = options.size ?? 24;
+  const absoluteStrokeWidth = options.absoluteStrokeWidth ?? false;
+
+  const parsedStrokeWidth = Number(strokeWidth);
+  const safeStrokeWidth = Number.isFinite(parsedStrokeWidth) ? parsedStrokeWidth : 2;
+
+  const parsedSize = Number(size);
+  const hasNumericSize = Number.isFinite(parsedSize) && parsedSize > 0;
+
+  const effectiveStrokeWidth =
+    absoluteStrokeWidth && hasNumericSize
+      ? (safeStrokeWidth * 24) / parsedSize
+      : safeStrokeWidth;
+  const pixelSize = Number(Math.min(2, Math.max(0.05, effectiveStrokeWidth / 2)).toFixed(3));
+  const pixelInset = Number(((1 - pixelSize) / 2).toFixed(3));
+
+  return { pixelSize, pixelInset };
+}
