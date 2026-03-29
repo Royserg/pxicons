@@ -8,6 +8,16 @@
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
-	"workers_dev": true,
+	"routes": [
+		{
+			"pattern": "pxicons.org",
+			"custom_domain": true
+		},
+		{
+			"pattern": "www.pxicons.org",
+			"custom_domain": true
+		}
+	],
+	"workers_dev": false,
 	"preview_urls": true
 }
