@@ -5,6 +5,9 @@ import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit(), devtoolsJson()],
+	ssr: {
+		noExternal: ['@pxicons/lucide']
+	},
 	server: {
 		watch: {
 			// Edit tab writes icon SVG source files directly; avoid full-page reload on save.

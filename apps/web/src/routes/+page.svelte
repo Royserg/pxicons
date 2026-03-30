@@ -81,6 +81,15 @@ export function App() {
 		}
 	] as const;
 
+	const packageManagers = [
+		{ id: 'npm', label: 'npm', prefix: 'npm install' },
+		{ id: 'pnpm', label: 'pnpm', prefix: 'pnpm add' },
+		{ id: 'yarn', label: 'yarn', prefix: 'yarn add' },
+		{ id: 'bun', label: 'bun', prefix: 'bun add' }
+	] as const;
+
+	type PackageManagerId = (typeof packageManagers)[number]['id'];
+
 	type DrawerTabId = 'usage' | 'customize' | 'edit';
 	type UsageTabId = (typeof usageTabs)[number]['id'];
 	type EditOutputTabId = 'preview' | 'diff';
@@ -109,6 +118,7 @@ export function App() {
 	let drawerOpen = $state(false);
 	let activeDrawerTab = $state<DrawerTabId>('usage');
 	let activeUsageTab = $state<UsageTabId>(usageTabs[0].id);
+	let activePackageManager = $state<PackageManagerId>('npm');
 	let activeEditOutputTab = $state<EditOutputTabId>('preview');
 	let customizeSvgCode = $state('');
 	let customizeSvgSourceIconId = $state('');
@@ -215,6 +225,11 @@ export function App() {
 			componentName: selectedIconComponentName,
 			iconId: selectedIcon.id
 		});
+	});
+
+	const installCommand = $derived.by(() => {
+		const pm = packageManagers.find((p) => p.id === activePackageManager) ?? packageManagers[0];
+		return `${pm.prefix} ${activeUsageTabConfig.packageName}`;
 	});
 
 	const customizeSourceSvg = $derived.by(() => {
@@ -1345,6 +1360,32 @@ export function App() {
 								</div>
 
 								<p class="usage-package">{activeUsageTabConfig.packageName}</p>
+
+								<div class="install-section">
+									<div class="install-pm-tabs" role="tablist" aria-label="Package manager">
+										{#each packageManagers as pm (pm.id)}
+											<button
+												type="button"
+												role="tab"
+												class:active={activePackageManager === pm.id}
+												aria-selected={activePackageManager === pm.id}
+												onclick={() => {
+													activePackageManager = pm.id;
+												}}
+											>
+												{pm.label}
+											</button>
+										{/each}
+									</div>
+									<button
+										type="button"
+										class="install-command"
+										onclick={() => copyText(installCommand, 'Install command')}
+										title="Click to copy"
+									>
+										<code>{installCommand}</code>
+									</button>
+								</div>
 
 								<div class="usage-code-wrap">
 									<div
