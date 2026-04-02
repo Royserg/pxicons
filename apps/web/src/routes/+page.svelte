@@ -1195,9 +1195,18 @@ export function App() {
 		queueFilterRun(queryInput, true);
 		window.addEventListener('resize', syncGridMetrics);
 
+		const handleSearchShortcut = (event: KeyboardEvent) => {
+			if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+				event.preventDefault();
+				document.getElementById('icon-search')?.focus();
+			}
+		};
+		window.addEventListener('keydown', handleSearchShortcut);
+
 		return () => {
 			clearPendingSearchTimers();
 			window.removeEventListener('resize', syncGridMetrics);
+			window.removeEventListener('keydown', handleSearchShortcut);
 		};
 	});
 
