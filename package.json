@@ -7,6 +7,7 @@
     "ready": "vp fmt && vp lint && vp run test -r && vp run build -r",
     "dev": "vp run web#dev",
     "dev:playground": "vp run lucide-svelte#build && vp run web#dev",
+    "mcp:svelte": "vp dlx sv add mcp",
     "verify:source-exports": "node ./tools/verify-source-exports.mjs",
     "frameworks:generate": "vp run lucide#generate && vp run lucide-react#generate && vp run lucide-svelte#generate",
     "frameworks:drift-check": "vp run lucide#test:consistency && vp run lucide-react#test:consistency && vp run lucide-svelte#test:consistency",

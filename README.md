@@ -2,6 +2,8 @@
 
 Pixel-art icons pack.
 
+Website: [pxicons.org](https://pxicons.org)  
+
 The project currently focuses on **pixel-art Lucide icons** and ships framework-specific packages for using them in real applications. The roadmap is to extend the same pipeline to additional icon packs over time.
 
 ## Lucide -> Pixel Art

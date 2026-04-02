@@ -67,7 +67,8 @@ All icons share the same API:
 
 ## Links
 
+- Docs: [pxicons.org/packages/lucide-svelte](https://pxicons.org/packages/lucide-svelte)
 - npm: [@pxicons/lucide-svelte](https://www.npmjs.com/package/@pxicons/lucide-svelte)
 - JSR: [@pxicons/lucide-svelte](https://jsr.io/@pxicons/lucide-svelte)
-- Source: [pxicons repository](https://github.com/Royserg/pxicons/tree/dev/packages/frameworks/lucide-svelte)
+- Icon catalog: [pxicons.org/icons](https://pxicons.org/icons)
 - Release guide: [`RELEASING.md`](./RELEASING.md)

@@ -1,7 +1,7 @@
 {
   "name": "@pxicons/lucide-svelte",
   "version": "0.1.0",
-  "description": "Lucide pixel-art icon components for Svelte.",
+  "description": "Pixelart Lucide icon components package for Svelte.",
   "license": "MIT",
   "type": "module",
   "types": "./dist/lucide/index.d.ts",
@@ -12,11 +12,15 @@
     "url": "git+https://github.com/Royserg/pxicons.git",
     "directory": "packages/frameworks/lucide-svelte"
   },
-  "homepage": "https://github.com/Royserg/pxicons/tree/dev/packages/frameworks/lucide-svelte#readme",
+  "homepage": "https://pxicons.org/packages/lucide-svelte",
   "bugs": {
     "url": "https://github.com/Royserg/pxicons/issues"
   },
   "keywords": [
+    "pixelart",
+    "pixel art",
+    "pixelart lucide icons",
+    "lucide icons",
     "icons",
     "lucide",
     "pixel-art",

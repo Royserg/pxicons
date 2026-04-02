@@ -44,3 +44,9 @@ All generated icons forward to the shared `Icon` base component.
 
 - If `title` is set, `<title>` is rendered.
 - If no `title` and no explicit accessibility props are passed, icons default to `aria-hidden="true"`.
+
+## Links
+
+- Docs: [pxicons.org/packages/lucide-react](https://pxicons.org/packages/lucide-react)
+- npm: [@pxicons/lucide-react](https://www.npmjs.com/package/@pxicons/lucide-react)
+- Icon catalog: [pxicons.org/icons](https://pxicons.org/icons)

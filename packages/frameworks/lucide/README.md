@@ -58,3 +58,8 @@ Existing exports remain available:
 - `extractPixelCellsFromSvg`
 - `buildRectRunsFromPixelCells`
 - `extractPixelRectRunsFromSvg`
+
+## Links
+
+- Docs: [pxicons.org/packages/lucide](https://pxicons.org/packages/lucide)
+- Icon catalog: [pxicons.org/icons](https://pxicons.org/icons)

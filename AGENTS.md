@@ -73,4 +73,17 @@ These commands map to their corresponding tools. For example, `vp dev --port 300
 
 - [ ] Run `vp install` after pulling remote changes and before getting started.
 - [ ] Run `vp check` and `vp test` to validate changes.
+
+## Svelte MCP (Required for SvelteKit tasks)
+
+Use the remote Svelte MCP server for Svelte/SvelteKit implementation and review work:
+
+- URL: `https://mcp.svelte.dev/mcp`
+- Auth: OAuth in your MCP client
+
+When doing SEO route/head updates in `apps/web`, treat MCP verification as a gate:
+
+1. Call `list-sections` first to discover relevant docs.
+2. Call `get-documentation` for all sections relevant to the current change.
+3. Run `svelte-autofixer` on changed Svelte files until there are no actionable issues.
 <!--VITE PLUS END-->

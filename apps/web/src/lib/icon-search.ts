@@ -1,24 +1,42 @@
 import type { PixelIcon } from '@pxicons/lucide';
 
+export interface PixelIconSearchIndexEntry {
+	icon: PixelIcon;
+	searchableText: string;
+}
+
 function normalize(input: string): string {
 	return input.trim().toLowerCase();
 }
 
-export function filterPixelIcons(icons: readonly PixelIcon[], query: string): PixelIcon[] {
+function createSearchableText(icon: PixelIcon): string {
+	return [icon.id, icon.name, ...icon.tags].map(normalize).join('\n');
+}
+
+export function buildPixelIconSearchIndex(
+	icons: readonly PixelIcon[]
+): readonly PixelIconSearchIndexEntry[] {
+	return icons.map((icon) => ({
+		icon,
+		searchableText: createSearchableText(icon)
+	}));
+}
+
+export function filterIndexedPixelIcons(
+	searchIndex: readonly PixelIconSearchIndexEntry[],
+	query: string
+): PixelIcon[] {
 	const normalizedQuery = normalize(query);
 
 	if (!normalizedQuery) {
-		return [...icons];
+		return searchIndex.map((entry) => entry.icon);
 	}
 
-	return icons.filter((icon) => {
-		const name = normalize(icon.name);
-		const id = normalize(icon.id);
+	return searchIndex
+		.filter((entry) => entry.searchableText.includes(normalizedQuery))
+		.map((entry) => entry.icon);
+}
 
-		if (name.includes(normalizedQuery) || id.includes(normalizedQuery)) {
-			return true;
-		}
-
-		return icon.tags.some((tag) => normalize(tag).includes(normalizedQuery));
-	});
+export function filterPixelIcons(icons: readonly PixelIcon[], query: string): PixelIcon[] {
+	return filterIndexedPixelIcons(buildPixelIconSearchIndex(icons), query);
 }
