@@ -41,21 +41,9 @@
 	};
 
 	const frameworkLinks = [
-		{
-			name: 'JavaScript',
-			href: '/packages/lucide',
-			svg: `<svg viewBox="0 0 64 64" aria-hidden="true" class="h-14 w-14"><g fill="#f6f6f8"><rect x="10" y="12" width="20" height="4"></rect><rect x="22" y="16" width="4" height="24"></rect><rect x="10" y="40" width="16" height="4"></rect><rect x="10" y="32" width="4" height="8"></rect><rect x="36" y="12" width="18" height="4"></rect><rect x="36" y="16" width="4" height="12"></rect><rect x="36" y="28" width="18" height="4"></rect><rect x="50" y="32" width="4" height="12"></rect><rect x="36" y="44" width="18" height="4"></rect></g></svg>`
-		},
-		{
-			name: 'Svelte',
-			href: '/packages/lucide-svelte',
-			svg: `<svg viewBox="0 0 64 64" aria-hidden="true" class="h-14 w-14"><g fill="#f6f6f8"><rect x="28" y="8" width="8" height="4"></rect><rect x="24" y="12" width="12" height="4"></rect><rect x="20" y="16" width="12" height="4"></rect><rect x="20" y="20" width="8" height="4"></rect><rect x="24" y="24" width="12" height="4"></rect><rect x="32" y="28" width="12" height="4"></rect><rect x="36" y="32" width="8" height="4"></rect><rect x="32" y="36" width="12" height="4"></rect><rect x="28" y="40" width="12" height="4"></rect><rect x="24" y="44" width="12" height="4"></rect><rect x="24" y="48" width="8" height="4"></rect><rect x="28" y="52" width="8" height="4"></rect></g></svg>`
-		},
-		{
-			name: 'React',
-			href: '/packages/lucide-react',
-			svg: `<svg viewBox="0 0 64 64" aria-hidden="true" class="h-14 w-14"><g fill="#f6f6f8"><rect x="28" y="28" width="8" height="8"></rect><rect x="14" y="28" width="8" height="4"></rect><rect x="42" y="32" width="8" height="4"></rect><rect x="22" y="16" width="4" height="4"></rect><rect x="38" y="44" width="4" height="4"></rect><rect x="38" y="16" width="4" height="4"></rect><rect x="22" y="44" width="4" height="4"></rect><rect x="18" y="20" width="4" height="4"></rect><rect x="42" y="40" width="4" height="4"></rect><rect x="42" y="20" width="4" height="4"></rect><rect x="18" y="40" width="4" height="4"></rect><rect x="24" y="12" width="4" height="4"></rect><rect x="36" y="48" width="4" height="4"></rect><rect x="36" y="12" width="4" height="4"></rect><rect x="24" y="48" width="4" height="4"></rect><rect x="16" y="24" width="4" height="4"></rect><rect x="44" y="36" width="4" height="4"></rect><rect x="44" y="24" width="4" height="4"></rect><rect x="16" y="36" width="4" height="4"></rect></g></svg>`
-		}
+		{ label: 'JS', href: '/packages/lucide' },
+		{ label: 'Svelte', href: '/packages/lucide-svelte' },
+		{ label: 'React', href: '/packages/lucide-react' }
 	] as const;
 </script>
 
@@ -104,23 +92,14 @@
 				>
 					Browse icons
 				</a>
-				<a
-					href="/pixelart-lucide-icons"
-					class="rounded-full border border-[var(--line)] px-5 py-2.5 text-sm text-foreground no-underline transition-colors hover:border-[var(--line-strong)]"
-				>
-					Read the Lucide guide
-				</a>
 			</div>
 		</div>
 
 		<div class="grid gap-3">
 			<div class="rounded-2xl border border-[var(--line)] bg-black/30 p-5">
 				<p class="text-[0.68rem] tracking-[0.16em] text-muted-foreground uppercase">Live today</p>
-				<h2 class="mt-3 text-2xl font-semibold">{iconCount.toLocaleString()} Lucide icons</h2>
-				<p class="mt-2 text-sm text-muted-foreground">
-					{lucidePack?.description ?? 'Pixel-perfect Lucide icons for fast product UI work.'}
-				</p>
-				<a class="mt-4 inline-block text-sm underline" href="/icons/lucide">Open Lucide browser</a>
+				<h2 class="mt-3 text-2xl font-semibold">{iconCount.toLocaleString()} pixel Lucide icons</h2>
+				<a class="mt-4 inline-block text-sm underline" href="/icons/lucide">-&gt; icons</a>
 			</div>
 		</div>
 	</section>
@@ -129,17 +108,13 @@
 		<p class="text-center text-[0.72rem] tracking-[0.18em] text-muted-foreground uppercase">
 			Available for
 		</p>
-		<div class="mx-auto mt-6 flex max-w-4xl flex-wrap items-center justify-center gap-8 md:gap-12">
-			{#each frameworkLinks as framework (framework.name)}
+		<div class="mx-auto mt-6 flex max-w-4xl flex-wrap items-center justify-center gap-6 md:gap-8">
+			{#each frameworkLinks as framework (framework.label)}
 				<a
 					href={framework.href}
-					class="group flex h-24 w-24 items-center justify-center no-underline transition-transform hover:-translate-y-1"
-					aria-label={framework.name}
+					class="text-lg text-white/75 no-underline transition-colors hover:text-white/100 md:text-xl"
 				>
-					<span class="sr-only">{framework.name}</span>
-					<div class="opacity-90 transition-opacity group-hover:opacity-100">
-						{@html framework.svg}
-					</div>
+					{framework.label}
 				</a>
 			{/each}
 		</div>
