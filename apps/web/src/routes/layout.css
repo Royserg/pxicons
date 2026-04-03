@@ -579,10 +579,15 @@ a {
 	font-size: 0.78rem;
 	line-height: 1.52;
 	color: #dce3f1;
+	cursor: text;
+	user-select: text;
+	-webkit-user-select: text;
 }
 
 .usage-code code {
 	white-space: pre;
+	user-select: text;
+	-webkit-user-select: text;
 }
 
 .usage-lang {
@@ -1017,6 +1022,8 @@ a {
 }
 
 .action-row button {
+	position: relative;
+	overflow: visible;
 	padding: 0.48rem 0.74rem;
 	border-radius: 8px;
 	border: 1px solid var(--line);
@@ -1030,10 +1037,43 @@ a {
 	border-color: var(--line-strong);
 }
 
-.copy-status {
-	margin: 0;
-	font-size: 0.75rem;
-	color: #d0d0d5;
+.copy-tooltip {
+	position: absolute;
+	left: 50%;
+	bottom: calc(100% + 0.45rem);
+	transform: translate(-50%, 0.45rem);
+	padding: 0.34rem 0.5rem;
+	border: 1px solid var(--line-strong);
+	background: #17181d;
+	color: var(--ink);
+	font-size: 0.68rem;
+	line-height: 1;
+	white-space: nowrap;
+	pointer-events: none;
+	box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
+	animation: copy-tooltip-rise 1.4s ease forwards;
+}
+
+@keyframes copy-tooltip-rise {
+	0% {
+		opacity: 0;
+		transform: translate(-50%, 0.55rem);
+	}
+
+	16% {
+		opacity: 1;
+		transform: translate(-50%, 0);
+	}
+
+	72% {
+		opacity: 1;
+		transform: translate(-50%, -0.06rem);
+	}
+
+	100% {
+		opacity: 0;
+		transform: translate(-50%, -0.4rem);
+	}
 }
 
 .empty-state {

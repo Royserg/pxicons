@@ -36,18 +36,18 @@
 
 	const usageTabs = [
 		{
-			id: 'svelte',
-			label: 'Svelte',
-			language: 'svelte',
-			packageName: '@pxicons/lucide-svelte',
-			buildSnippet: buildSvelteSnippet
-		},
-		{
 			id: 'vanilla',
 			label: 'Vanilla',
 			language: 'html',
 			packageName: '@pxicons/lucide',
 			buildSnippet: buildVanillaSnippet
+		},
+		{
+			id: 'svelte',
+			label: 'Svelte',
+			language: 'svelte',
+			packageName: '@pxicons/lucide-svelte',
+			buildSnippet: buildSvelteSnippet
 		},
 		{
 			id: 'react',
@@ -67,6 +67,7 @@
 
 	type UsageTabId = (typeof usageTabs)[number]['id'];
 	type PackageManagerId = (typeof packageManagers)[number]['id'];
+	type CopyFeedbackTarget = 'source' | 'usage';
 
 	let icons = $state<readonly PixelIcon[]>([]);
 	let searchIndex = $state<readonly PixelIconSearchIndexEntry[]>([]);
@@ -80,9 +81,13 @@
 	let isSearchLoading = $state(false);
 	let selectedId = $state('');
 	let drawerOpen = $state(false);
-	let activeUsageTab = $state<UsageTabId>('svelte');
+	let activeUsageTab = $state<UsageTabId>('vanilla');
 	let activePackageManager = $state<PackageManagerId>('npm');
-	let copyStatus = $state('');
+	let copyFeedback = $state<{
+		target: CopyFeedbackTarget;
+		message: string;
+		nonce: number;
+	} | null>(null);
 	let pendingClearSelection = $state(false);
 	let gridWidth = $state(0);
 	let gridGap = $state(8);
@@ -91,6 +96,7 @@
 	let searchRequestId = 0;
 	let activeLoadingTimer: number | null = null;
 	let activeFilterTimer: number | null = null;
+	let activeCopyFeedbackTimer: number | null = null;
 
 	let gridViewportElement = $state<HTMLElement | null>(null);
 
@@ -268,7 +274,7 @@
 		pendingClearSelection = false;
 		selectedId = icon.id;
 		drawerOpen = true;
-		copyStatus = '';
+		copyFeedback = null;
 	}
 
 	function requestCloseDrawer(): void {
@@ -278,14 +284,14 @@
 
 		pendingClearSelection = true;
 		drawerOpen = false;
-		copyStatus = '';
+		copyFeedback = null;
 	}
 
 	function clearSelectionImmediately(): void {
 		pendingClearSelection = false;
 		selectedId = '';
 		drawerOpen = false;
-		copyStatus = '';
+		copyFeedback = null;
 	}
 
 	function handleDrawerOpenChange(open: boolean): void {
@@ -310,16 +316,36 @@
 		pendingClearSelection = false;
 	}
 
-	async function copyText(value: string, label: string): Promise<void> {
+	function clearCopyFeedbackTimer(): void {
+		if (activeCopyFeedbackTimer !== null) {
+			window.clearTimeout(activeCopyFeedbackTimer);
+			activeCopyFeedbackTimer = null;
+		}
+	}
+
+	function showCopyFeedback(target: CopyFeedbackTarget, message: string): void {
+		clearCopyFeedbackTimer();
+		copyFeedback = {
+			target,
+			message,
+			nonce: (copyFeedback?.nonce ?? 0) + 1
+		};
+		activeCopyFeedbackTimer = window.setTimeout(() => {
+			copyFeedback = null;
+			activeCopyFeedbackTimer = null;
+		}, 1400);
+	}
+
+	async function copyText(target: CopyFeedbackTarget, value: string, label: string): Promise<void> {
 		if (!value) {
 			return;
 		}
 
 		try {
 			await navigator.clipboard.writeText(value);
-			copyStatus = `${label} copied to clipboard.`;
+			showCopyFeedback(target, 'Copied');
 		} catch {
-			copyStatus = `${label} copy failed. Clipboard permission may be blocked.`;
+			showCopyFeedback(target, 'Copy failed');
 		}
 	}
 
@@ -361,6 +387,7 @@
 
 		return () => {
 			clearPendingSearchTimers();
+			clearCopyFeedbackTimer();
 			window.removeEventListener('resize', syncGridMetrics);
 			window.removeEventListener('keydown', handleSearchShortcut);
 		};
@@ -526,41 +553,53 @@
 								<button
 									type="button"
 									class="install-command"
-									onclick={() => copyText(installCommand, 'Install command')}
+									onclick={() => {
+										void navigator.clipboard.writeText(installCommand);
+									}}
 									title="Click to copy"
 								>
 									<code>{installCommand}</code>
 								</button>
 							</div>
 
-							<div class="usage-code-wrap">
+							<div class="usage-code-wrap" data-vaul-no-drag>
 								<div
 									id={`usage-panel-${activeUsageTabConfig.id}`}
 									role="tabpanel"
 									class="usage-panel"
 									aria-labelledby={`usage-tab-${activeUsageTabConfig.id}`}
 								>
-									<pre class="usage-code"><code>{usageSnippet}</code></pre>
+									<pre class="usage-code" data-vaul-no-drag><code>{usageSnippet}</code></pre>
 								</div>
 								<span class="usage-lang">{activeUsageTabConfig.language}</span>
 							</div>
 						</div>
 
 						<div class="action-row">
-							<button type="button" onclick={() => copyText(selectedIcon.svg, 'Source SVG')}>
+							<button
+								type="button"
+								onclick={() => copyText('source', selectedIcon.svg, 'Source SVG')}
+							>
 								Copy source SVG
+								{#if copyFeedback?.target === 'source'}
+									{#key copyFeedback.nonce}
+										<span class="copy-tooltip">{copyFeedback.message}</span>
+									{/key}
+								{/if}
 							</button>
 							<button
 								type="button"
-								onclick={() => copyText(usageSnippet, `${activeUsageTabConfig.label} usage`)}
+								onclick={() =>
+									copyText('usage', usageSnippet, `${activeUsageTabConfig.label} usage`)}
 							>
 								Copy {activeUsageTabConfig.label} usage
+								{#if copyFeedback?.target === 'usage'}
+									{#key copyFeedback.nonce}
+										<span class="copy-tooltip">{copyFeedback.message}</span>
+									{/key}
+								{/if}
 							</button>
 						</div>
-
-						{#if copyStatus}
-							<p class="copy-status">{copyStatus}</p>
-						{/if}
 					</div>
 				</section>
 			</Drawer.Content>

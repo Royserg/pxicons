@@ -7,11 +7,11 @@ export function toComponentName(iconId: string): string {
 }
 
 export function buildSvelteSnippet(componentName: string): string {
-	return `<script lang="ts">\n  import { ${componentName} } from '@pxicons/lucide-svelte';\n<\/script>\n\n<${componentName} size={24} color="currentColor" />`;
+	return `<script lang="ts">\n  import { ${componentName} } from '@pxicons/lucide-svelte';\n<\/script>\n\n<${componentName} size={24} />`;
 }
 
 export function buildReactSnippet(componentName: string): string {
-	return `import { ${componentName} } from '@pxicons/lucide-react';\n\nexport function App() {\n  return <${componentName} size={24} color="currentColor" />;\n}`;
+	return `import { ${componentName} } from '@pxicons/lucide-react';\n\nexport function App() {\n  return <${componentName} size={24} />;\n}`;
 }
 
 export function buildVanillaSnippet(iconId: string): string {
